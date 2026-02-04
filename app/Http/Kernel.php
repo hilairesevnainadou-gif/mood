@@ -71,5 +71,6 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\VerifyCsrfToken::class,
         // AJOUTEZ 'permission' ICI
         'permission' => \App\Http\Middleware\CheckPermission::class,
+        'profile.documents.validated' => \App\Http\Middleware\EnsureProfileDocumentsValidated::class,
     ];
 }

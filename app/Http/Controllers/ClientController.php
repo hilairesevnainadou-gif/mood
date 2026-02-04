@@ -472,6 +472,25 @@ class ClientController extends Controller
                 ->with('warning', 'Veuillez vérifier votre adresse email pour accéder au tableau de bord.');
         }
 
+        $missingDocuments = $user->getMissingUploadedRequiredDocuments();
+
+        if (! empty($missingDocuments)) {
+            $missingNames = collect($missingDocuments)
+                ->pluck('name')
+                ->filter()
+                ->values()
+                ->implode(', ');
+
+            $message = 'Veuillez télécharger vos pièces d\'identité obligatoires pour accéder au tableau de bord.';
+
+            if ($missingNames !== '') {
+                $message = 'Documents manquants : ' . $missingNames . '. Veuillez les télécharger pour accéder au tableau de bord.';
+            }
+
+            return redirect()->route('client.documents.index')
+                ->with('warning', $message);
+        }
+
         // Récupérer ou créer le wallet
         $wallet = Wallet::where('user_id', $user->id)->first();
 

@@ -8,7 +8,8 @@
     <div class="pwa-page-header">
         <div class="pwa-header-bg"></div>
         <div class="pwa-header-content">
-            <a href="{{ route('client.dashboard') }}" class="pwa-back-btn">
+            <a href="{{ Auth::user()->hasUploadedRequiredDocuments() ? route('client.dashboard') : route('client.documents.index') }}"
+                class="pwa-back-btn">
                 <i class="fas fa-arrow-left"></i>
             </a>
             <div class="pwa-header-text">
@@ -117,7 +118,8 @@
 
     {{-- Barre de boutons fixe - CORRIGÉE --}}
     <div class="pwa-submit-bar">
-        <a href="{{ route('client.dashboard') }}" class="pwa-btn-secondary">Annuler</a>
+        <a href="{{ Auth::user()->hasUploadedRequiredDocuments() ? route('client.dashboard') : route('client.documents.index') }}"
+            class="pwa-btn-secondary">Annuler</a>
         <button type="submit" form="settingsForm" class="pwa-btn-primary">
             <i class="fas fa-save"></i>
             <span>Enregistrer</span>

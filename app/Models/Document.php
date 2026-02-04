@@ -411,6 +411,35 @@ class Document extends Model
         return $missingDocuments;
     }
 
+    public static function getMissingUploadedRequiredDocuments($userId, $memberType)
+    {
+        $requiredDocuments = RequiredDocument::getByMemberType($memberType, true);
+        $missingDocuments = [];
+
+        foreach ($requiredDocuments as $requiredDoc) {
+            $exists = self::where('user_id', $userId)
+                ->where('type', $requiredDoc->document_type)
+                ->where('is_profile_document', true)
+                ->whereIn('status', ['pending', 'validated'])
+                ->where(function ($query) use ($requiredDoc) {
+                    if ($requiredDoc->has_expiry_date) {
+                        $query->where(function ($q) {
+                                $q->whereNull('expiry_date')
+                                    ->orWhere('expiry_date', '>', now());
+                            })
+                            ->where('is_expired', false);
+                    }
+                })
+                ->exists();
+
+            if (! $exists && $requiredDoc->is_required) {
+                $missingDocuments[] = $requiredDoc;
+            }
+        }
+
+        return $missingDocuments;
+    }
+
     public static function isValidDocumentType($memberType, $documentType)
     {
         return RequiredDocument::where('member_type', $memberType)

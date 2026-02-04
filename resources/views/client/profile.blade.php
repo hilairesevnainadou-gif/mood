@@ -320,7 +320,8 @@
 
         {{-- Actions --}}
         <div class="form-actions">
-            <a href="{{ route('client.dashboard') }}" class="btn-secondary">
+            <a href="{{ Auth::user()->hasUploadedRequiredDocuments() ? route('client.dashboard') : route('client.documents.index') }}"
+                class="btn-secondary">
                 <i class="fas fa-times"></i> Annuler
             </a>
             <button type="submit" class="btn-primary" id="submitBtn">

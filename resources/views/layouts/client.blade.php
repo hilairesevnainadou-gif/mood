@@ -61,6 +61,11 @@
 </head>
 
 <body class="client-body">
+    @php
+        $user = Auth::user();
+        $hasUploadedRequiredDocuments = $user?->hasUploadedRequiredDocuments() ?? false;
+        $hasValidatedRequiredDocuments = $user?->hasAllRequiredDocuments() ?? false;
+    @endphp
     <!-- Preloader Professionnel -->
     <div class="app-preloader" id="appPreloader">
         <div class="preloader-content">
@@ -238,33 +243,37 @@
                     <div class="menu-section">
                         <h6 class="section-title">Navigation</h6>
                         <ul class="menu-list" role="menu">
-                            <li class="menu-item {{ Request::is('client/dashboard*') ? 'active' : '' }}">
-                                <a href="{{ route('client.dashboard') }}" class="menu-link page-transition"
-                                    role="menuitem">
-                                    <span class="menu-icon" aria-hidden="true">
-                                        <i class="fas fa-chart-line"></i>
-                                    </span>
-                                    <span class="menu-text">Tableau de bord</span>
-                                </a>
-                            </li>
-                            <li class="menu-item {{ Request::is('client/portefeuille*') ? 'active' : '' }}">
-                                <a href="{{ route('client.wallet') }}" class="menu-link page-transition"
-                                    role="menuitem">
-                                    <span class="menu-icon" aria-hidden="true">
-                                        <i class="fas fa-wallet"></i>
-                                    </span>
-                                    <span class="menu-text">Mon Portefeuille</span>
-                                </a>
-                            </li>
-                            <li class="menu-item {{ Request::is('client/demandes*') ? 'active' : '' }}">
-                                <a href="{{ route('client.requests.index') }}" class="menu-link page-transition"
-                                    role="menuitem">
-                                    <span class="menu-icon" aria-hidden="true">
-                                        <i class="fas fa-file-contract"></i>
-                                    </span>
-                                    <span class="menu-text">Mes Demandes</span>
-                                </a>
-                            </li>
+                            @if ($hasUploadedRequiredDocuments)
+                                <li class="menu-item {{ Request::is('client/dashboard*') ? 'active' : '' }}">
+                                    <a href="{{ route('client.dashboard') }}" class="menu-link page-transition"
+                                        role="menuitem">
+                                        <span class="menu-icon" aria-hidden="true">
+                                            <i class="fas fa-chart-line"></i>
+                                        </span>
+                                        <span class="menu-text">Tableau de bord</span>
+                                    </a>
+                                </li>
+                            @endif
+                            @if ($hasValidatedRequiredDocuments)
+                                <li class="menu-item {{ Request::is('client/portefeuille*') ? 'active' : '' }}">
+                                    <a href="{{ route('client.wallet') }}" class="menu-link page-transition"
+                                        role="menuitem">
+                                        <span class="menu-icon" aria-hidden="true">
+                                            <i class="fas fa-wallet"></i>
+                                        </span>
+                                        <span class="menu-text">Mon Portefeuille</span>
+                                    </a>
+                                </li>
+                                <li class="menu-item {{ Request::is('client/demandes*') ? 'active' : '' }}">
+                                    <a href="{{ route('client.requests.index') }}" class="menu-link page-transition"
+                                        role="menuitem">
+                                        <span class="menu-icon" aria-hidden="true">
+                                            <i class="fas fa-file-contract"></i>
+                                        </span>
+                                        <span class="menu-text">Mes Demandes</span>
+                                    </a>
+                                </li>
+                            @endif
                         </ul>
                     </div>
 
@@ -281,15 +290,17 @@
                                     <span class="menu-text">Documents</span>
                                 </a>
                             </li>
-                            <li class="menu-item {{ Request::is('client/formations*') ? 'active' : '' }}">
-                                <a href="{{ route('client.trainings') }}" class="menu-link page-transition"
-                                    role="menuitem">
-                                    <span class="menu-icon" aria-hidden="true">
-                                        <i class="fas fa-graduation-cap"></i>
-                                    </span>
-                                    <span class="menu-text">Formations</span>
-                                </a>
-                            </li>
+                            @if ($hasValidatedRequiredDocuments)
+                                <li class="menu-item {{ Request::is('client/formations*') ? 'active' : '' }}">
+                                    <a href="{{ route('client.trainings') }}" class="menu-link page-transition"
+                                        role="menuitem">
+                                        <span class="menu-icon" aria-hidden="true">
+                                            <i class="fas fa-graduation-cap"></i>
+                                        </span>
+                                        <span class="menu-text">Formations</span>
+                                    </a>
+                                </li>
+                            @endif
                         </ul>
                     </div>
 
@@ -366,24 +377,28 @@
 
         <!-- Bottom Navigation (Mobile Only) -->
         <nav class="app-bottom-nav" id="bottomNav" aria-label="Navigation mobile">
-            <a href="{{ route('client.dashboard') }}"
-                class="nav-item page-transition {{ Request::is('client/dashboard*') ? 'active' : '' }}"
-                aria-label="Accueil">
-                <i class="fas fa-home" aria-hidden="true"></i>
-                <span>Accueil</span>
-            </a>
-            <a href="{{ route('client.wallet') }}"
-                class="nav-item page-transition {{ Request::is('client/portefeuille*') ? 'active' : '' }}"
-                aria-label="Portefeuille">
-                <i class="fas fa-wallet" aria-hidden="true"></i>
-                <span>Portefeuille</span>
-            </a>
-            <a href="{{ route('client.requests.index') }}"
-                class="nav-item page-transition {{ Request::is('client/demandes*') ? 'active' : '' }}"
-                aria-label="Demandes">
-                <i class="fas fa-file-alt" aria-hidden="true"></i>
-                <span>Demandes</span>
-            </a>
+            @if ($hasUploadedRequiredDocuments)
+                <a href="{{ route('client.dashboard') }}"
+                    class="nav-item page-transition {{ Request::is('client/dashboard*') ? 'active' : '' }}"
+                    aria-label="Accueil">
+                    <i class="fas fa-home" aria-hidden="true"></i>
+                    <span>Accueil</span>
+                </a>
+            @endif
+            @if ($hasValidatedRequiredDocuments)
+                <a href="{{ route('client.wallet') }}"
+                    class="nav-item page-transition {{ Request::is('client/portefeuille*') ? 'active' : '' }}"
+                    aria-label="Portefeuille">
+                    <i class="fas fa-wallet" aria-hidden="true"></i>
+                    <span>Portefeuille</span>
+                </a>
+                <a href="{{ route('client.requests.index') }}"
+                    class="nav-item page-transition {{ Request::is('client/demandes*') ? 'active' : '' }}"
+                    aria-label="Demandes">
+                    <i class="fas fa-file-alt" aria-hidden="true"></i>
+                    <span>Demandes</span>
+                </a>
+            @endif
             <a href="{{ route('client.profile') }}"
                 class="nav-item page-transition {{ Request::is('client/profile*') ? 'active' : '' }}"
                 aria-label="Profil">
