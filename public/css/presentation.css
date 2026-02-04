@@ -1,0 +1,869 @@
+/* CSS À AJOUTER DANS PRESENTATION.CSS */
+
+/* ========================
+   WRAPPER GLOBAL
+   ======================== */
+.bh-presentation-wrapper {
+    width: 100%;
+    float: left;
+    background-color: #fff;
+    overflow-x: hidden;
+}
+
+/* ========================
+   SECTION HERO
+   ======================== */
+.bh-hero-presentation {
+    width: 100%;
+    float: left;
+    padding: 90px 0;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    position: relative;
+}
+
+.bh-hero-content {
+    width: 100%;
+    float: left;
+    padding-right: 30px;
+}
+
+.bh-hero-title {
+    width: 100%;
+    float: left;
+    font-size: 48px;
+    color: #2e2d2e;
+    padding-bottom: 20px;
+    text-transform: uppercase;
+    font-weight: bold;
+    font-family: 'Rajdhani', sans-serif;
+}
+
+.bh-hero-title .bh-highlight {
+    color: #1b5a8d;
+    position: relative;
+}
+
+.bh-hero-description {
+    width: 90%;
+    float: left;
+    font-size: 18px;
+    color: #666666;
+    margin-left: 0;
+    line-height: 1.6;
+    margin-bottom: 40px;
+}
+
+.bh-hero-stats {
+    width: 100%;
+    float: left;
+    display: flex;
+    gap: 30px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+}
+
+.bh-stat-item {
+    text-align: center;
+    min-width: 120px;
+}
+
+.bh-stat-number {
+    font-size: 36px;
+    font-weight: 700;
+    color: #1b5a8d;
+    line-height: 1;
+    margin-bottom: 5px;
+    font-family: 'Rajdhani', sans-serif;
+}
+
+.bh-stat-label {
+    font-size: 14px;
+    color: #666;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.bh-hero-actions {
+    width: 100%;
+    float: left;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 30px;
+}
+
+/* Styles des boutons spécifiques à la présentation */
+.bh-hero-actions .more_bt,
+.bh-hero-actions .contact_bt {
+    float: left;
+}
+
+.bh-hero-actions .more_bt a {
+    width: 100%;
+    float: left;
+    font-size: 16px;
+    color: #000;
+    border: 2px solid #ff5a58;
+    text-align: center;
+    padding: 12px 0px;
+    border-radius: 40px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.bh-hero-actions .more_bt a:hover {
+    color: #000;
+    background-color: #ff5a58;
+    border: 2px solid #ff5a58;
+}
+
+.bh-hero-actions .contact_bt a {
+    width: 100%;
+    float: left;
+    font-size: 16px;
+    color: #181818;
+    border: 2px solid #1b5a8d;
+    text-align: center;
+    padding: 12px 0px;
+    border-radius: 40px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.bh-hero-actions .contact_bt a:hover {
+    color: #ffffff;
+    background-color: #1b5a8d;
+    border: 2px solid #1b5a8d;
+}
+
+.bh-hero-visual {
+    width: 100%;
+    float: left;
+    padding: 20px;
+}
+
+.placeholder-visual {
+    width: 100%;
+    float: left;
+    background: linear-gradient(135deg, #1b5a8d, #2a5298);
+    border-radius: 15px;
+    padding: 60px 30px;
+    text-align: center;
+    color: white;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.placeholder-visual i {
+    margin-bottom: 20px;
+}
+
+.placeholder-visual h4 {
+    font-size: 24px;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.placeholder-visual p {
+    opacity: 0.9;
+    margin: 0;
+}
+
+/* ========================
+   SECTION TIMELINE
+   ======================== */
+.bh-timeline-section {
+    width: 100%;
+    float: left;
+    background-color: #fff;
+}
+
+.bh-timeline-container {
+    width: 100%;
+    float: left;
+    padding-top: 40px;
+}
+
+/* ========================
+   SECTION MODÈLE
+   ======================== */
+.bh-model-section {
+    width: 100%;
+    float: left;
+    background-color: #f8f9fa;
+    padding-top: 90px;
+    padding-bottom: 90px;
+}
+
+.bh-model-content {
+    width: 100%;
+    float: left;
+    padding-right: 30px;
+}
+
+.bh-model-features {
+    width: 100%;
+    float: left;
+    margin-top: 30px;
+}
+
+.bh-feature-item {
+    width: 100%;
+    float: left;
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    border-left: 4px solid #1b5a8d;
+}
+
+.feature-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #1b5a8d, #2a5298);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 20px;
+    flex-shrink: 0;
+    color: #fff;
+    font-size: 24px;
+}
+
+.feature-content h5 {
+    font-size: 18px;
+    color: #1b5a8d;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-family: 'Rajdhani', sans-serif;
+}
+
+.feature-content p {
+    color: #666;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.system-cycle {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    width: 100%;
+}
+
+.cycle-step {
+    background: #fff;
+    border-radius: 15px;
+    padding: 25px 20px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+    border: 2px solid #eef2f7;
+    transition: all 0.3s ease;
+}
+
+.cycle-step:hover {
+    transform: translateY(-5px);
+    border-color: #1b5a8d;
+}
+
+.step-number {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #1b5a8d, #2a5298);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    font-weight: 700;
+    font-size: 20px;
+}
+
+.cycle-step h5 {
+    font-size: 18px;
+    color: #1b5a8d;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.cycle-step p {
+    color: #666;
+    font-size: 14px;
+    margin: 0;
+}
+
+/* Bouton dans la section modèle */
+.bh-model-content .moremore_bt {
+    width: 200px;
+    float: left;
+    margin-top: 40px;
+}
+
+.bh-model-content .moremore_bt a {
+    width: 100%;
+    float: left;
+    font-size: 16px;
+    color: #1b5a8d;
+    border: 2px solid #1b5a8d;
+    text-align: center;
+    padding: 12px 0px;
+    border-radius: 40px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.bh-model-content .moremore_bt a:hover {
+    color: #ffffff;
+    background-color: #1b5a8d;
+    border: 2px solid #1b5a8d;
+}
+
+/* ========================
+   SECTION PROCESSUS
+   ======================== */
+.bh-process-steps {
+    width: 100%;
+    float: left;
+    max-width: 800px;
+    margin: 0 auto;
+    padding-top: 40px;
+}
+
+.bh-process-step {
+    width: 100%;
+    float: left;
+    background: #fff;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    border: 2px solid #eef2f7;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.bh-process-step.active {
+    border-color: #1b5a8d;
+    box-shadow: 0 10px 30px rgba(27, 90, 141, 0.1);
+}
+
+.step-number {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #1b5a8d, #2a5298);
+    color: #fff;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    margin-right: 25px;
+    float: left;
+}
+
+.step-content {
+    width: calc(100% - 95px);
+    float: left;
+}
+
+.step-title {
+    width: 100%;
+    float: left;
+    font-size: 22px;
+    color: #1b5a8d;
+    margin: 0 0 15px 0;
+    font-weight: 600;
+    font-family: 'Rajdhani', sans-serif;
+}
+
+.step-description {
+    width: 100%;
+    float: left;
+    color: #666;
+    line-height: 1.6;
+    margin: 0;
+    font-size: 16px;
+}
+
+.mission-details {
+    width: 100%;
+    float: left;
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.mission {
+    width: 100%;
+    float: left;
+    margin-bottom: 20px;
+}
+
+.mission:last-child {
+    margin-bottom: 0;
+}
+
+.mission h5 {
+    color: #1b5a8d;
+    font-size: 18px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.mission h5 i {
+    margin-right: 10px;
+}
+
+.mission p {
+    color: #666;
+    font-size: 15px;
+    margin-bottom: 15px;
+}
+
+.mission ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.mission ul li {
+    padding: 8px 0;
+    color: #555;
+    font-size: 15px;
+    position: relative;
+    padding-left: 25px;
+}
+
+.mission ul li:before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #1b5a8d;
+    font-weight: bold;
+}
+
+/* Bouton dans la section processus */
+.bh-process-section .more_bt {
+    width: 250px;
+    margin: 0 auto;
+    float: none;
+}
+
+.bh-process-section .more_bt a {
+    width: 100%;
+    float: left;
+    font-size: 18px;
+    color: #ffffff;
+    background-color: #1b5a8d;
+    border: 2px solid #1b5a8d;
+    text-align: center;
+    padding: 15px 0px;
+    border-radius: 40px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.bh-process-section .more_bt a:hover {
+    color: #ffffff;
+    background-color: #144670;
+    border: 2px solid #144670;
+}
+
+/* ========================
+   SECTION GARANTIES
+   ======================== */
+.bh-guarantees-section {
+    width: 100%;
+    float: left;
+    background-color: #fff;
+    padding-top: 90px;
+    padding-bottom: 90px;
+}
+
+.bh-guarantee-card {
+    width: 100%;
+    float: left;
+    background-color: #1b5a8d;
+    border-radius: 10px;
+    padding: 40px 30px;
+    text-align: center;
+    margin-bottom: 30px;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.bh-guarantee-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+}
+
+.bh-guarantee-card .accounting_text {
+    color: #ffffff;
+    font-size: 22px;
+    margin: 20px 0 15px;
+}
+
+.bh-guarantee-card .lorem_text {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 25px;
+}
+
+/* Boutons dans les cartes de garantie */
+.bh-guarantee-card .moremore_bt_1 {
+    width: 170px;
+    margin: 0 auto;
+    text-align: center;
+    margin-top: 20px;
+}
+
+.bh-guarantee-card .moremore_bt_1 a {
+    width: 100%;
+    float: left;
+    font-size: 16px;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    text-align: center;
+    padding: 10px 0px;
+    border-radius: 40px;
+    text-transform: uppercase;
+}
+
+.bh-guarantee-card .moremore_bt_1 a:hover {
+    color: #1b5a8d;
+    background-color: #ffffff;
+    border: 2px solid #ffffff;
+}
+
+/* ========================
+   SECTION CTA
+   ======================== */
+.bh-cta-section {
+    width: 100%;
+    float: left;
+    background-color: #1b5a8d;
+    padding: 90px 0;
+}
+
+.bh-cta-content {
+    width: 100%;
+    float: left;
+}
+
+.bh-cta-stats {
+    width: 100%;
+    float: left;
+    display: flex;
+    justify-content: center;
+    gap: 50px;
+    margin: 40px 0;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 42px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 5px;
+    font-family: 'Rajdhani', sans-serif;
+}
+
+.stat-label {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.9);
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.bh-cta-buttons {
+    width: 100%;
+    float: left;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+    margin-top: 40px;
+}
+
+/* Boutons dans la section CTA */
+.bh-cta-buttons .more_bt,
+.bh-cta-buttons .contact_bt {
+    float: left;
+}
+
+.bh-cta-buttons .more_bt a {
+    width: 100%;
+    float: left;
+    font-size: 16px;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    text-align: center;
+    padding: 12px 0px;
+    border-radius: 40px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.bh-cta-buttons .more_bt a:hover {
+    color: #1b5a8d;
+    background-color: #ffffff;
+    border: 2px solid #ffffff;
+}
+
+.bh-cta-buttons .contact_bt a {
+    width: 100%;
+    float: left;
+    font-size: 16px;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    text-align: center;
+    padding: 12px 0px;
+    border-radius: 40px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.bh-cta-buttons .contact_bt a:hover {
+    color: #1b5a8d;
+    background-color: #ffffff;
+    border: 2px solid #ffffff;
+}
+
+/* ========================
+   ANIMATIONS
+   ======================== */
+.animated {
+    animation-duration: 1s;
+    animation-fill-mode: both;
+}
+
+@keyframes fadeInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.fadeInLeft {
+    animation-name: fadeInLeft;
+}
+
+@keyframes fadeInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.fadeInRight {
+    animation-name: fadeInRight;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fadeInUp {
+    animation-name: fadeInUp;
+}
+
+/* ========================
+   RESPONSIVE DESIGN
+   ======================== */
+@media (max-width: 1200px) {
+    .bh-hero-title {
+        font-size: 42px;
+    }
+
+    .bh-stat-number {
+        font-size: 32px;
+    }
+}
+
+@media (max-width: 991px) {
+    .bh-hero-presentation {
+        padding: 60px 0;
+    }
+
+    .bh-hero-title {
+        font-size: 36px;
+        text-align: center;
+    }
+
+    .bh-hero-description {
+        text-align: center;
+        margin: 0 auto 30px;
+    }
+
+    .bh-hero-content {
+        padding-right: 0;
+        padding-top: 30px;
+    }
+
+    .bh-hero-stats {
+        justify-content: center;
+    }
+
+    .bh-hero-actions {
+        justify-content: center;
+    }
+
+    .bh-model-content {
+        padding-right: 0;
+        margin-bottom: 40px;
+    }
+
+    .step-number {
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
+        margin-right: 20px;
+    }
+
+    .step-content {
+        width: calc(100% - 80px);
+    }
+}
+
+@media (max-width: 767px) {
+    .bh-hero-title {
+        font-size: 32px;
+    }
+
+    .bh-hero-description {
+        font-size: 16px;
+    }
+
+    .bh-stat-item {
+        min-width: 100px;
+    }
+
+    .bh-stat-number {
+        font-size: 28px;
+    }
+
+    .bh-hero-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .bh-hero-actions .more_bt,
+    .bh-hero-actions .contact_bt {
+        width: 100%;
+        max-width: 300px;
+        margin-bottom: 15px;
+    }
+
+    .bh-feature-item {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .feature-icon {
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+
+    .system-cycle {
+        grid-template-columns: 1fr;
+    }
+
+    .bh-process-step {
+        padding: 20px;
+    }
+
+    .step-number {
+        float: none;
+        margin: 0 auto 20px;
+    }
+
+    .step-content {
+        width: 100%;
+        text-align: center;
+    }
+
+    .bh-cta-stats {
+        gap: 30px;
+    }
+
+    .stat-number {
+        font-size: 36px;
+    }
+
+    .bh-cta-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .bh-cta-buttons .more_bt,
+    .bh-cta-buttons .contact_bt {
+        width: 100%;
+        max-width: 300px;
+        margin-bottom: 15px;
+    }
+}
+
+@media (max-width: 575px) {
+    .bh-hero-title {
+        font-size: 28px;
+    }
+
+    .bh-hero-stats {
+        gap: 20px;
+    }
+
+    .bh-stat-item {
+        min-width: 80px;
+    }
+
+    .bh-stat-number {
+        font-size: 24px;
+    }
+
+    .accounting_text_1 {
+        font-size: 32px;
+    }
+
+    .yers_text {
+        font-size: 18px;
+    }
+
+    .stat-number {
+        font-size: 30px;
+    }
+
+    .stat-label {
+        font-size: 14px;
+    }
+}
