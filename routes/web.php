@@ -211,7 +211,7 @@ Route::middleware(['auth', 'verified'])->prefix('client')->name('client.')->grou
     Route::get('/dashboard', [ClientController::class, 'dashboard'])->name('dashboard');
 
     // DEMANDES DE FINANCEMENT
-   Route::prefix('demandes')->name('requests.')->group(function () {
+   Route::prefix('demandes')->name('requests.')->middleware('profile.documents.validated')->group(function () {
 
         // Statiques
         Route::get('/', [RequestFundingController::class, 'index'])->name('index');
@@ -244,7 +244,7 @@ Route::middleware(['auth', 'verified'])->prefix('client')->name('client.')->grou
 
 
     // Portefeuille
-    Route::prefix('/portefeuille')->group(function () {
+    Route::prefix('/portefeuille')->middleware('profile.documents.validated')->group(function () {
         Route::get('/', [WalletController::class, 'wallet'])->name('wallet');
         Route::get('/transactions', [WalletController::class, 'transactions'])->name('wallet.transactions');
         Route::post('/deposit', [WalletController::class, 'deposit'])->name('wallet.deposit');
@@ -295,10 +295,12 @@ Route::middleware(['auth', 'verified'])->prefix('client')->name('client.')->grou
     });
 
     // Formations
-    Route::get('/formations', [ClientController::class, 'trainings'])->name('trainings');
-    Route::get('/formations/{id}', [ClientController::class, 'trainingDetail'])->name('trainings.detail');
-    Route::post('/formations/{id}/inscription', [ClientController::class, 'enrollTraining'])->name('trainings.enroll');
-    Route::get('/formations/mes-cours', [ClientController::class, 'myTrainings'])->name('trainings.my');
+    Route::middleware('profile.documents.validated')->group(function () {
+        Route::get('/formations', [ClientController::class, 'trainings'])->name('trainings');
+        Route::get('/formations/{id}', [ClientController::class, 'trainingDetail'])->name('trainings.detail');
+        Route::post('/formations/{id}/inscription', [ClientController::class, 'enrollTraining'])->name('trainings.enroll');
+        Route::get('/formations/mes-cours', [ClientController::class, 'myTrainings'])->name('trainings.my');
+    });
 
     // Support Client
     Route::get('/support', [ClientController::class, 'support'])->name('support');

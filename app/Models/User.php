@@ -369,9 +369,20 @@ public function hasAllRequiredDocuments()
     return empty($missing);
 }
 
+public function hasUploadedRequiredDocuments()
+{
+    $missing = Document::getMissingUploadedRequiredDocuments($this->id, $this->member_type);
+    return empty($missing);
+}
+
 // Méthode pour obtenir les documents manquants
 public function getMissingRequiredDocuments()
 {
     return Document::getMissingRequiredDocuments($this->id, $this->member_type);
+}
+
+public function getMissingUploadedRequiredDocuments()
+{
+    return Document::getMissingUploadedRequiredDocuments($this->id, $this->member_type);
 }
 }

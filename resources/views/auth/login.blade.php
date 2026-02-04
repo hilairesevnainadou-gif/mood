@@ -32,6 +32,7 @@
             justify-content: center;
             padding: 20px;
             margin: 0;
+            position: relative;
         }
 
         .login-container {
@@ -168,6 +169,41 @@
         .login-links a:hover {
             color: var(--secondary-color);
             text-decoration: underline;
+        }
+
+        .auth-topbar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.25rem;
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+            z-index: 10;
+        }
+
+        .auth-topbar a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .auth-topbar .auth-links {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        .auth-link-chip {
+            padding: 0.35rem 0.85rem;
+            border-radius: 999px;
+            border: 1px solid rgba(27, 90, 141, 0.2);
+            background: rgba(27, 90, 141, 0.08);
         }
 
         .feature-list {
@@ -334,6 +370,15 @@
     </style>
 </head>
 <body>
+    <div class="auth-topbar">
+        <a href="{{ route('home') }}">
+            <i class="fas fa-arrow-left me-2"></i>Retour au site
+        </a>
+        <div class="auth-links">
+            <span>Pas de compte ?</span>
+            <a href="{{ route('register') }}" class="auth-link-chip">Créer un compte</a>
+        </div>
+    </div>
     <div class="login-container">
         <!-- Panneau gauche -->
         <div class="login-left">
