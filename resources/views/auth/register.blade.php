@@ -164,6 +164,25 @@
 .recap-table tr:last-child td { border-bottom: none; }
 .recap-table td:first-child { color: #6b7280; width: 40%; }
 .recap-table td:last-child { font-weight: 600; color: #111827; }
+
+.auth-switch {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 1rem;
+    font-size: 0.95rem;
+    color: var(--bh-gray);
+    gap: 0.5rem;
+}
+
+.auth-switch a {
+    color: var(--bh-primary);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.auth-switch a:hover {
+    text-decoration: underline;
+}
 </style>
 
 <!-- Toast Container -->
@@ -180,6 +199,11 @@
             <button class="swal-button swal-button-primary" id="swalConfirm">OK</button>
         </div>
     </div>
+</div>
+
+<div class="auth-switch">
+    <span>Déjà inscrit ?</span>
+    <a href="{{ route('login') }}">Se connecter</a>
 </div>
 
 <div class="inscription-card">

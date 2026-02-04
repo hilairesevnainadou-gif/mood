@@ -211,6 +211,50 @@
             </div>
         </header>
 
+        @if (! $hasUploadedRequiredDocuments)
+            <div class="status-banner">
+                <div class="status-banner-content">
+                    <div>
+                        <span class="status-badge status-warning">
+                            <i class="fas fa-file-upload" aria-hidden="true"></i>
+                            Documents requis
+                        </span>
+                        <p class="status-banner-message">
+                            Téléchargez vos pièces d'identité obligatoires pour accéder au tableau de bord.
+                        </p>
+                    </div>
+                    <div class="status-banner-actions">
+                        <a href="{{ route('client.documents.upload.form') }}" class="btn-primary">
+                            Télécharger maintenant
+                        </a>
+                        <a href="{{ route('client.documents.index') }}" class="btn-secondary">
+                            Voir mes documents
+                        </a>
+                    </div>
+                </div>
+            </div>
+        @elseif ($hasUploadedRequiredDocuments && ! $hasValidatedRequiredDocuments)
+            <div class="status-banner">
+                <div class="status-banner-content">
+                    <div>
+                        <span class="status-badge status-warning">
+                            <i class="fas fa-hourglass-half" aria-hidden="true"></i>
+                            Validation en cours
+                        </span>
+                        <p class="status-banner-message">
+                            Vos documents sont en cours de validation. Les demandes, wallet et formations seront
+                            disponibles après validation.
+                        </p>
+                    </div>
+                    <div class="status-banner-actions">
+                        <a href="{{ route('client.documents.index') }}" class="btn-secondary">
+                            Suivre mes documents
+                        </a>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- Main Content Area -->
         <main class="app-main" id="mainContent">
             <!-- Side Navigation -->
