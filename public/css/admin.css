@@ -1,0 +1,233 @@
+:root {
+    --admin-primary: #1b5a8d;
+    --admin-primary-dark: #134163;
+    --admin-bg: #f5f7fb;
+    --admin-card: #ffffff;
+    --admin-muted: #6b7280;
+    --admin-border: #e5e7eb;
+}
+
+body.admin-body,
+body.admin-auth-body {
+    font-family: "Inter", "Poppins", sans-serif;
+    background: var(--admin-bg);
+    color: #1f2937;
+    margin: 0;
+}
+
+.admin-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.admin-sidebar {
+    width: 260px;
+    background: var(--admin-primary);
+    color: #fff;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.admin-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-brand img {
+    width: 48px;
+    height: 48px;
+}
+
+.admin-brand span {
+    display: block;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.admin-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.admin-nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    text-decoration: none;
+    padding: 10px 12px;
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+.admin-nav a:hover,
+.admin-nav a.active {
+    background: var(--admin-primary-dark);
+}
+
+.admin-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-topbar {
+    background: linear-gradient(135deg, var(--admin-primary), #2563eb);
+    color: #fff;
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.admin-topbar h1 {
+    margin: 0;
+    font-size: 1.6rem;
+}
+
+.admin-topbar p {
+    margin: 4px 0 0;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.admin-content {
+    padding: 24px 32px;
+}
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.admin-card {
+    background: var(--admin-card);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.admin-card h3 {
+    margin-top: 0;
+    font-size: 1.05rem;
+}
+
+.admin-metric {
+    font-size: 2rem;
+    margin: 0;
+    font-weight: 700;
+}
+
+.admin-section {
+    margin-top: 24px;
+}
+
+.admin-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.admin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    background: var(--admin-card);
+    padding: 20px;
+    border-radius: 16px;
+}
+
+.admin-form-full {
+    grid-column: 1 / -1;
+}
+
+.form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 12px;
+}
+
+.admin-inline-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    align-items: center;
+}
+
+.admin-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-thread-item {
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #f1f5f9;
+}
+
+.admin-thread-item.admin {
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+}
+
+.admin-thread-item.client {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.admin-thread-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--admin-muted);
+}
+
+.admin-auth-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--admin-primary), #0f172a);
+}
+
+.admin-auth-card {
+    background: #fff;
+    padding: 32px;
+    border-radius: 20px;
+    width: min(420px, 90%);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+}
+
+.admin-auth-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.admin-auth-header img {
+    width: 64px;
+    margin-bottom: 8px;
+}
+
+.admin-auth-header h1 {
+    margin-bottom: 4px;
+}
+
+@media (max-width: 992px) {
+    .admin-layout {
+        flex-direction: column;
+    }
+
+    .admin-sidebar {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+}

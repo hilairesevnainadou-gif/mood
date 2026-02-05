@@ -43,7 +43,7 @@ class FundingValidationController extends Controller {
             'duration' => $request->duration,
             'admin_validation_notes' => $request->comments,
             'validated_at' => now(),
-            'validated_by' => auth()->id(),
+            'validated_by' => auth('admin')->id(),
         ]);
 
         // Notification au client
@@ -82,7 +82,7 @@ class FundingValidationController extends Controller {
         if ($request->action === 'validate') {
             $payment->update([
                 'status' => 'completed',
-                'verified_by' => auth()->id(),
+                'verified_by' => auth('admin')->id(),
                 'verified_at' => now(),
                 'admin_notes' => $request->admin_notes,
             ]);
@@ -108,7 +108,7 @@ class FundingValidationController extends Controller {
             $payment->update([
                 'status' => 'failed',
                 'admin_notes' => $request->admin_notes,
-                'verified_by' => auth()->id(),
+                'verified_by' => auth('admin')->id(),
                 'verified_at' => now(),
             ]);
 
