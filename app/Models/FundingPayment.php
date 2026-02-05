@@ -58,6 +58,11 @@ class FundingPayment extends Model
         return $this->belongsTo(Funding::class, 'funding_request_id');
     }
 
+    public function fundingRequest()
+    {
+        return $this->belongsTo(FundingRequest::class, 'funding_request_id');
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
