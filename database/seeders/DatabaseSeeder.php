@@ -9,9 +9,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            AdminSeeder::class,
             RequiredDocumentsSeeder::class,
-            // FundingTypeSeeder::class,
-            // MobilePaymentConfigSeeder::class,
+            FundingTypeSeeder::class,
+            MobilePaymentConfigSeeder::class,
+
         ]);
     }
 }

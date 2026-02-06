@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="Inscription - Banque Humanitaire du Développement Mondial">
+    <meta name="description" content="@yield('meta_description', 'BHDM - Banque Humanitaire du Développement Mondial')">
     <meta name="theme-color" content="#1b5a8d">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Inscription') - BHDM</title>
+    <title>@yield('title') - BHDM</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ asset('images/favicon.png') }}">
 
     <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
 
     <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -31,36 +31,24 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="BHDM">
 
-    <!-- Styles internes BHDM -->
+    <!-- Styles communs -->
     <style>
-        /* ============================================
-           VARIABLES CSS - THÈME BHDM
-        ============================================ */
         :root {
-            /* Palette principale */
             --bh-primary: #1b5a8d;
             --bh-primary-dark: #0a1f44;
             --bh-primary-light: #4aafff;
             --bh-accent: #ff5a58;
             --bh-accent-light: #ff8a8a;
-
-            /* Couleurs fonctionnelles */
             --bh-success: #28a745;
             --bh-warning: #ffc107;
             --bh-danger: #dc3545;
             --bh-info: #17a2b8;
-
-            /* Niveaux de gris */
             --bh-light: #f8f9fa;
             --bh-gray: #6c757d;
             --bh-gray-dark: #343a40;
             --bh-gray-light: #e9ecef;
-
-            /* Typographie */
             --bh-font-heading: 'Rajdhani', sans-serif;
             --bh-font-body: 'Poppins', sans-serif;
-
-            /* Effets */
             --bh-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
             --bh-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.12);
             --bh-border-radius: 12px;
@@ -68,53 +56,59 @@
             --bh-transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        /* ============================================
-           RÉINITIALISATION ET BASE
-        ============================================ */
-        *, *::before, *::after {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html {
-            font-size: 16px;
-            scroll-behavior: smooth;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { font-size: 16px; scroll-behavior: smooth; }
 
         body {
             font-family: var(--bh-font-body);
             line-height: 1.6;
-            color: var(--bh-gray-dark);
-            background: linear-gradient(135deg, #f8fafc 0%, #e9ecef 100%);
             min-height: 100vh;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
 
         /* ============================================
-           LAYOUT PRINCIPAL
+           MODE INSCRIPTION (Step Wizard)
         ============================================ */
-        .inscription-app {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow-x: hidden;
+        body.mode-inscription {
+            background: linear-gradient(135deg, #f8fafc 0%, #e9ecef 100%);
+            color: var(--bh-gray-dark);
         }
 
-        /* Header */
-        .inscription-header {
+        /* ============================================
+           MODE CONNEXION (Split Screen)
+        ============================================ */
+        body.mode-connexion {
+            background: linear-gradient(135deg, #0a1f44 0%, #1b5a8d 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* ============================================
+           HEADER COMMUN
+        ============================================ */
+        .auth-header {
             background: white;
             padding: 1rem 2rem;
             box-shadow: var(--bh-shadow);
             position: sticky;
             top: 0;
             z-index: 1030;
-            animation: slideDown 0.5s ease;
         }
 
-        .inscription-header-container {
+        body.mode-connexion .auth-header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 16px;
+            padding: 0.75rem 1.25rem;
+        }
+
+        .auth-header-container {
             max-width: 1200px;
             margin: 0 auto;
             display: flex;
@@ -133,10 +127,7 @@
             transition: opacity 0.3s;
         }
 
-        .brand-section:hover {
-            opacity: 0.8;
-            color: inherit;
-        }
+        body.mode-connexion .brand-section { color: var(--bh-primary-dark); }
 
         .brand-logo {
             width: 50px;
@@ -156,7 +147,6 @@
             font-family: var(--bh-font-heading);
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--bh-primary-dark);
             margin: 0;
             line-height: 1.2;
         }
@@ -167,13 +157,13 @@
             margin: 0;
         }
 
-        .header-actions {
+        .auth-links {
             display: flex;
             gap: 1rem;
             align-items: center;
         }
 
-        .btn-login {
+        .btn-auth-nav {
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -187,14 +177,16 @@
             background: transparent;
         }
 
-        .btn-login:hover {
+        .btn-auth-nav:hover {
             background: var(--bh-primary);
             color: white;
             transform: translateY(-2px);
         }
 
-        /* Main Content */
-        .inscription-main {
+        /* ============================================
+           CONTAINER INSCRIPTION (Step Wizard)
+        ============================================ */
+        .inscription-wrapper {
             flex: 1;
             padding: 2rem 1rem;
             display: flex;
@@ -210,7 +202,6 @@
             animation: fadeIn 0.8s ease;
         }
 
-        /* Carte principale */
         .inscription-card {
             background: white;
             border-radius: var(--bh-border-radius-lg);
@@ -239,15 +230,10 @@
             margin: 0;
         }
 
-        .inscription-card-body {
-            padding: 2.5rem;
-        }
+        .inscription-card-body { padding: 2.5rem; }
 
         /* Progression */
-        .step-progress {
-            margin-bottom: 2.5rem;
-        }
-
+        .step-progress { margin-bottom: 2.5rem; }
         .step-progress-bar {
             height: 6px;
             background: var(--bh-gray-light);
@@ -256,7 +242,6 @@
             margin-bottom: 1rem;
             overflow: hidden;
         }
-
         .step-progress-fill {
             position: absolute;
             top: 0;
@@ -322,30 +307,20 @@
             transition: var(--bh-transition);
         }
 
-        .step-indicator.active .step-label {
-            color: var(--bh-primary);
-            font-weight: 600;
-        }
+        .step-indicator.active .step-label { color: var(--bh-primary); font-weight: 600; }
+        .step-indicator.completed .step-label { color: var(--bh-success); }
 
-        .step-indicator.completed .step-label {
-            color: var(--bh-success);
-        }
-
-        /* Formulaire */
+        /* Formulaire multi-étapes */
         .form-step {
             display: none;
             animation: slideIn 0.4s ease;
         }
-
-        .form-step.active {
-            display: block;
-        }
+        .form-step.active { display: block; }
 
         .step-header {
             margin-bottom: 2rem;
             text-align: center;
         }
-
         .step-header h3 {
             font-family: var(--bh-font-heading);
             font-size: 1.75rem;
@@ -356,14 +331,8 @@
             justify-content: center;
             gap: 0.75rem;
         }
+        .step-header p { color: var(--bh-gray); font-size: 1.05rem; margin: 0; }
 
-        .step-header p {
-            color: var(--bh-gray);
-            font-size: 1.05rem;
-            margin: 0;
-        }
-
-        /* Navigation */
         .step-navigation {
             display: flex;
             justify-content: space-between;
@@ -374,67 +343,66 @@
             gap: 1rem;
         }
 
-        .btn-step {
-            padding: 0.875rem 2rem;
-            border-radius: 10px;
-            font-weight: 600;
-            font-size: 1rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
-            transition: var(--bh-transition);
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .btn-step-prev {
+        /* ============================================
+           CONTAINER CONNEXION (Split Screen)
+        ============================================ */
+        .login-container {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            min-height: 700px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            overflow: hidden;
             background: white;
-            color: var(--bh-primary);
-            border: 2px solid var(--bh-primary);
         }
 
-        .btn-step-prev:hover {
-            background: rgba(27, 90, 141, 0.05);
-            transform: translateX(-3px);
-        }
-
-        .btn-step-next {
-            background: linear-gradient(135deg, var(--bh-primary) 0%, var(--bh-primary-light) 100%);
+        .login-left {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
             color: white;
-            box-shadow: 0 4px 15px rgba(27, 90, 141, 0.2);
+            position: relative;
         }
 
-        .btn-step-next:hover {
-            transform: translateX(3px);
-            box-shadow: 0 8px 20px rgba(27, 90, 141, 0.3);
-            color: white;
+        body.mode-connexion .auth-header + .login-container { margin-top: 80px; }
+
+        .login-right {
+            flex: 1;
+            background: white;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
-        .btn-step-submit {
-            background: linear-gradient(135deg, var(--bh-success) 0%, #34ce57 100%);
-            color: white;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 40px 0;
         }
-
-        .btn-step-submit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.3);
-            color: white;
+        .feature-list li {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 1.1rem;
         }
+        .feature-list i { color: var(--bh-accent); font-size: 1.5rem; }
 
-        /* Footer */
-        .inscription-footer {
+        /* ============================================
+           FOOTER
+        ============================================ */
+        .auth-footer {
             background: var(--bh-primary-dark);
             color: white;
             padding: 2rem;
             text-align: center;
             margin-top: auto;
-        }
-
-        .inscription-footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
         }
 
         .footer-links {
@@ -444,18 +412,13 @@
             margin-bottom: 1rem;
             flex-wrap: wrap;
         }
-
         .footer-links a {
             color: rgba(255, 255, 255, 0.8);
             text-decoration: none;
             transition: var(--bh-transition);
             font-size: 0.95rem;
         }
-
-        .footer-links a:hover {
-            color: white;
-            text-decoration: underline;
-        }
+        .footer-links a:hover { color: white; text-decoration: underline; }
 
         .footer-copyright {
             font-size: 0.9rem;
@@ -463,131 +426,104 @@
             margin: 0;
         }
 
-        /* Animations */
+        /* ============================================
+           ANIMATIONS
+        ============================================ */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
         @keyframes slideDown {
             from { transform: translateY(-100%); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
-
         @keyframes slideIn {
             from { transform: translateX(30px); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .inscription-header {
-                padding: 1rem;
-            }
-
-            .brand-text h1 {
-                font-size: 1.25rem;
-            }
-
-            .brand-text p {
-                display: none;
-            }
-
-            .inscription-card-header {
-                padding: 1.5rem;
-            }
-
-            .inscription-card-header h2 {
-                font-size: 1.5rem;
-            }
-
-            .inscription-card-body {
-                padding: 1.5rem;
-            }
-
-            .step-indicators {
-                gap: 0.5rem;
-            }
-
-            .step-label {
-                font-size: 0.75rem;
-            }
-
-            .step-number {
-                width: 35px;
-                height: 35px;
-                font-size: 0.9rem;
-            }
-
-            .step-navigation {
-                flex-direction: column-reverse;
-            }
-
-            .btn-step {
-                width: 100%;
-                justify-content: center;
-            }
+        /* ============================================
+           RESPONSIVE
+        ============================================ */
+        @media (max-width: 992px) {
+            .login-container { flex-direction: column; max-width: 500px; }
+            .login-left { display: none; }
+            .login-right { padding: 30px 20px; }
+            body.mode-connexion { padding: 10px; }
+            body.mode-connexion .auth-header { position: relative; top: 0; left: 0; right: 0; margin-bottom: 20px; }
         }
 
-        /* Utilitaires */
-        .text-primary-bh { color: var(--bh-primary) !important; }
-        .bg-primary-bh { background-color: var(--bh-primary) !important; }
+        @media (max-width: 768px) {
+            .auth-header { padding: 1rem; }
+            .brand-text h1 { font-size: 1.25rem; }
+            .brand-text p { display: none; }
+            .inscription-card-header { padding: 1.5rem; }
+            .inscription-card-header h2 { font-size: 1.5rem; }
+            .inscription-card-body { padding: 1.5rem; }
+            .step-indicators { gap: 0.5rem; }
+            .step-label { font-size: 0.75rem; }
+            .step-number { width: 35px; height: 35px; font-size: 0.9rem; }
+            .step-navigation { flex-direction: column-reverse; }
+            .btn-step { width: 100%; justify-content: center; }
+        }
+
+        /* Utilitaires spécifiques au contenu */
+        @yield('page_styles')
     </style>
 
-    <!-- Styles additionnels spécifiques à la page -->
     @stack('styles')
 </head>
-<body>
-    <div class="inscription-app">
-        <!-- Header -->
-        <header class="inscription-header">
-            <div class="inscription-header-container">
-                <a href="{{ url('/') }}" class="brand-section">
-                    <div class="brand-logo">
-                        <i class="fas fa-hand-holding-heart"></i>
-                    </div>
-                    <div class="brand-text">
-                        <h1>BHDM</h1>
-                        <p>Banque Humanitaire du Développement Mondial</p>
-                    </div>
-                </a>
+<body class="@yield('body_class', 'mode-inscription')">
 
-                <div class="header-actions">
-                    <a href="{{ route('login') }}" class="btn-login">
+    <!-- Header -->
+    <header class="auth-header">
+        <div class="auth-header-container">
+            <a href="{{ url('/') }}" class="brand-section">
+                <div class="brand-logo">
+                    <i class="fas fa-hand-holding-heart"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>BHDM</h1>
+                    <p>Banque Humanitaire du Développement Mondial</p>
+                </div>
+            </a>
+
+            <div class="auth-links">
+                @hasSection('auth_nav_button')
+                    @yield('auth_nav_button')
+                @else
+                    <a href="{{ route('login') }}" class="btn-auth-nav">
                         <i class="fas fa-sign-in-alt"></i>
                         <span>Connexion</span>
                     </a>
-                </div>
+                @endif
             </div>
-        </header>
+        </div>
+    </header>
 
-        <!-- Contenu principal -->
-        <main class="inscription-main">
-            <div class="inscription-container">
-                @yield('content')
+    <!-- Contenu principal -->
+    @yield('content_wrapper')
+
+    <!-- Footer (uniquement en mode inscription) -->
+    @section('footer')
+    <footer class="auth-footer">
+        <div class="auth-footer-content">
+            <div class="footer-links">
+                <a href="{{ route('terms') }}">Conditions d'utilisation</a>
+                <a href="{{ route('privacy') }}">Politique de confidentialité</a>
+                <a href="{{ route('faq') }}">FAQ</a>
+                <a href="{{ route('contact') }}">Contact</a>
             </div>
-        </main>
+            <p class="footer-copyright">
+                &copy; {{ date('Y') }} BHDM - Banque Humanitaire du Développement Mondial. Tous droits réservés.
+            </p>
+        </div>
+    </footer>
+    @show
 
-        <!-- Footer -->
-        <footer class="inscription-footer">
-            <div class="inscription-footer-content">
-                <div class="footer-links">
-                    <a href="{{ route('terms') }}">Conditions d'utilisation</a>
-                    <a href="{{ route('privacy') }}">Politique de confidentialité</a>
-                    <a href="{{ route('faq') }}">FAQ</a>
-                    <a href="{{ route('contact') }}">Contact</a>
-                </div>
-                <p class="footer-copyright">
-                    &copy; {{ date('Y') }} BHDM - Banque Humanitaire du Développement Mondial. Tous droits réservés.
-                </p>
-            </div>
-        </footer>
-    </div>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 
-    <!-- Bootstrap JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
-
-    <!-- Scripts spécifiques à la page -->
     @stack('scripts')
 </body>
 </html>

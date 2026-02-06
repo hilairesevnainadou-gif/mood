@@ -102,208 +102,206 @@ class ClientController extends Controller
 
 
     public function register(Request $request)
-{
-    Log::info('Début inscription utilisateur', [
-        'ip' => $request->ip(),
-        'account_type' => $request->input('account_type'),
-        'email' => $request->input('email'),
-        'all_data' => $request->except(['password', 'password_confirmation'])
-    ]);
+    {
+        Log::info('Début inscription utilisateur', [
+            'ip' => $request->ip(),
+            'account_type' => $request->input('account_type'),
+            'email' => $request->input('email'),
+            'all_data' => $request->except(['password', 'password_confirmation'])
+        ]);
 
-    $messages = [
-        'required' => 'Le champ :attribute est obligatoire.',
-        'email.unique' => 'Cette adresse email est déjà utilisée.',
-        'phone.unique' => 'Ce numéro de téléphone est déjà associé à un compte.',
-        'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
-        'terms.accepted' => 'Vous devez accepter les conditions générales.',
-        'company_name.required_if' => 'Le nom de l\'entreprise est obligatoire pour les comptes entreprise.',
-        'company_type.required_if' => 'La forme juridique est obligatoire pour les comptes entreprise.',
-        'sector.required_if' => 'Le secteur d\'activité est obligatoire pour les comptes entreprise.',
-        'position.required_if' => 'La fonction est obligatoire pour les comptes entreprise.',
-    ];
-
-    $attributes = [
-        'email' => 'adresse email',
-        'phone' => 'numéro de téléphone',
-        'name' => 'nom complet',
-        'password' => 'mot de passe',
-        'terms' => 'les conditions générales',
-        'company_name' => 'nom de l\'entreprise',
-        'company_type' => 'forme juridique',
-        'sector' => 'secteur d\'activité',
-        'position' => 'fonction',
-    ];
-
-    try {
-        // ================= VALIDATION CONDITIONNELLE =================
-        $rules = [
-            'account_type' => 'required|in:particulier,entreprise',
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users',
-            'phone' => 'required|string|max:20|unique:users',
-            'city' => 'required|string|max:255',
-            'country' => 'required|string|max:255',
-            'address' => 'required|string|max:500',
-            'password' => 'required|min:8|confirmed',
-            'terms' => 'required|accepted',
+        $messages = [
+            'required' => 'Le champ :attribute est obligatoire.',
+            'email.unique' => 'Cette adresse email est déjà utilisée.',
+            'phone.unique' => 'Ce numéro de téléphone est déjà associé à un compte.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'terms.accepted' => 'Vous devez accepter les conditions générales.',
+            'company_name.required_if' => 'Le nom de l\'entreprise est obligatoire pour les comptes entreprise.',
+            'company_type.required_if' => 'La forme juridique est obligatoire pour les comptes entreprise.',
+            'sector.required_if' => 'Le secteur d\'activité est obligatoire pour les comptes entreprise.',
+            'position.required_if' => 'La fonction est obligatoire pour les comptes entreprise.',
         ];
 
-        // Ajouter les règles spécifiques aux entreprises uniquement si c'est une entreprise
-        if ($request->input('account_type') === 'entreprise') {
-            $rules = array_merge($rules, [
-                'company_name' => 'required|string|max:255',
-                'company_type' => 'required|string|max:100',
-                'position' => 'required|string|max:255',
-                'sector' => 'required|string|max:255',
-            ]);
-        }
-
-        $validated = $request->validate($rules, $messages, $attributes);
-
-        Log::info('Validation utilisateur réussie', [
-            'email' => $validated['email'],
-            'account_type' => $validated['account_type'],
-        ]);
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        Log::error('ÉCHEC VALIDATION ÉTAPE 1', [
-            'errors' => $e->errors(),
-            'input' => $request->except(['password', 'password_confirmation'])
-        ]);
-        throw $e;
-    }
-
-    DB::beginTransaction();
-
-    try {
-        // ================= USER =================
-        $nameParts = explode(' ', $validated['name'], 2);
-
-        $userData = [
-            'first_name' => $nameParts[0],
-            'last_name' => $nameParts[1] ?? '',
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
-            'city' => $validated['city'],
-            'country' => $validated['country'],
-            'address' => $validated['address'],
-            'password' => Hash::make($validated['password']),
-            'member_type' => $validated['account_type'],
-            'member_id' => $this->generateMemberId(),
-            'is_active' => true,
-            'is_verified' => false,
-            'member_status' => 'pending',
-            'member_since' => now(),
+        $attributes = [
+            'email' => 'adresse email',
+            'phone' => 'numéro de téléphone',
+            'name' => 'nom complet',
+            'password' => 'mot de passe',
+            'terms' => 'les conditions générales',
+            'company_name' => 'nom de l\'entreprise',
+            'company_type' => 'forme juridique',
+            'sector' => 'secteur d\'activité',
+            'position' => 'fonction',
         ];
 
-        // Ajouter les champs entreprise uniquement si c'est une entreprise
-        if ($validated['account_type'] === 'entreprise') {
-            $userData = array_merge($userData, [
-                'company_name' => $validated['company_name'],
-                'company_type' => $validated['company_type'],
-                'job_title' => $validated['position'],
-                'sector' => $validated['sector'],
-            ]);
-        }
+        try {
+            // ================= VALIDATION CONDITIONNELLE =================
+            $rules = [
+                'account_type' => 'required|in:particulier,entreprise',
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:users',
+                'phone' => 'required|string|max:20|unique:users',
+                'city' => 'required|string|max:255',
+                'country' => 'required|string|max:255',
+                'address' => 'required|string|max:500',
+                'password' => 'required|min:8|confirmed',
+                'terms' => 'required|accepted',
+            ];
 
-        $user = User::create($userData);
-
-        Log::info('Utilisateur créé', ['user_id' => $user->id, 'type' => $validated['account_type']]);
-
-        // ================= WALLET (Pour tous) =================
-        $wallet = Wallet::create([
-            'user_id' => $user->id,
-            'wallet_number' => $this->generateWalletNumber(),
-            'balance' => 0,
-            'currency' => 'XOF',
-            'pin_hash' => Hash::make('000000'),
-        ]);
-
-        // ================= ENTREPRISE UNIQUEMENT =================
-        if ($validated['account_type'] === 'entreprise') {
-            try {
-                $entrepriseRules = [
-                    'project_name' => 'nullable|string|max:255',
-                    'project_description' => 'nullable|string|min:50',
-                    'funding_type_id' => 'nullable|exists:funding_types,id',
-                    'funding_needed' => 'nullable|numeric|min:1000',
-                    'duration' => 'nullable|integer|min:6|max:60',
-                ];
-
-                $entrepriseData = $request->validate($entrepriseRules, $messages);
-
-                Log::info('Validation projet entreprise', $entrepriseData);
-
-                // Création de la demande de financement uniquement si une offre est sélectionnée
-                if (!empty($entrepriseData['funding_type_id'])) {
-                    $type = FundingType::find($entrepriseData['funding_type_id']);
-
-                    if ($type) {
-                        $fundingRequest = FundingRequest::create([
-                            'user_id' => $user->id,
-                            'request_number' => $this->generateRequestNumber(),
-                            'funding_type_id' => $type->id,
-                            'title' => $entrepriseData['project_name'] ?? ($type->name . ' - ' . $user->company_name),
-                            'description' => $entrepriseData['project_description'] ?? 'Projet à compléter',
-                            'type' => $type->category ?? 'autre',
-                            'is_predefined' => true,
-                            'amount_requested' => $entrepriseData['funding_needed'] ?? $type->amount ?? 0,
-                            'duration' => $entrepriseData['duration'] ?? 12,
-                            'expected_payment' => $type->registration_fee ?? 0,
-                            'status' => 'pending',
-                            'local_committee_country' => $user->country,
-                            'project_location' => $user->city . ', ' . $user->country,
-                            'expected_jobs' => 0,
-                        ]);
-
-                        Log::info('Demande de financement créée', ['funding_request_id' => $fundingRequest->id]);
-                    }
-                } else {
-                    Log::info('Aucune offre de financement sélectionnée pour cette entreprise');
-                }
-
-            } catch (\Illuminate\Validation\ValidationException $e) {
-                Log::error('ÉCHEC VALIDATION PROJET ENTREPRISE', [
-                    'errors' => $e->errors(),
-                    'user_id' => $user->id
+            // Ajouter les règles spécifiques aux entreprises uniquement si c'est une entreprise
+            if ($request->input('account_type') === 'entreprise') {
+                $rules = array_merge($rules, [
+                    'company_name' => 'required|string|max:255',
+                    'company_type' => 'required|string|max:100',
+                    'position' => 'required|string|max:255',
+                    'sector' => 'required|string|max:255',
                 ]);
-                DB::rollBack();
-                throw $e;
             }
-        } else {
-            Log::info('Compte particulier créé sans demande de financement');
+
+            $validated = $request->validate($rules, $messages, $attributes);
+
+            Log::info('Validation utilisateur réussie', [
+                'email' => $validated['email'],
+                'account_type' => $validated['account_type'],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('ÉCHEC VALIDATION ÉTAPE 1', [
+                'errors' => $e->errors(),
+                'input' => $request->except(['password', 'password_confirmation'])
+            ]);
+            throw $e;
         }
 
-        DB::commit();
+        DB::beginTransaction();
 
-        Log::info('INSCRIPTION COMPLÈTE', [
-            'user_id' => $user->id,
-            'type' => $validated['account_type']
-        ]);
+        try {
+            // ================= USER =================
+            $nameParts = explode(' ', $validated['name'], 2);
 
-        $user->sendEmailVerificationNotification();
-        Auth::login($user);
+            $userData = [
+                'first_name' => $nameParts[0],
+                'last_name' => $nameParts[1] ?? '',
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'],
+                'city' => $validated['city'],
+                'country' => $validated['country'],
+                'address' => $validated['address'],
+                'password' => Hash::make($validated['password']),
+                'member_type' => $validated['account_type'],
+                'member_id' => $this->generateMemberId(),
+                'is_active' => true,
+                'is_verified' => false,
+                'member_status' => 'pending',
+                'member_since' => now(),
+            ];
 
-        return redirect()->route('verification.notice')->with([
-            'success' => 'Inscription réussie ! Veuillez vérifier votre email.',
-            'account_type' => $validated['account_type'],
-        ]);
+            // Ajouter les champs entreprise uniquement si c'est une entreprise
+            if ($validated['account_type'] === 'entreprise') {
+                $userData = array_merge($userData, [
+                    'company_name' => $validated['company_name'],
+                    'company_type' => $validated['company_type'],
+                    'job_title' => $validated['position'],
+                    'sector' => $validated['sector'],
+                ]);
+            }
 
-    } catch (\Throwable $e) {
-        DB::rollBack();
+            $user = User::create($userData);
 
-        Log::error('ERREUR CRITIQUE INSCRIPTION', [
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'trace' => $e->getTraceAsString(),
-        ]);
+            Log::info('Utilisateur créé', ['user_id' => $user->id, 'type' => $validated['account_type']]);
 
-        return back()
-            ->with('error', 'Une erreur est survenue: ' . $e->getMessage())
-            ->withInput();
+            // ================= WALLET (Pour tous) =================
+            $wallet = Wallet::create([
+                'user_id' => $user->id,
+                'wallet_number' => $this->generateWalletNumber(),
+                'balance' => 0,
+                'currency' => 'XOF',
+                'pin_hash' => Hash::make('000000'),
+            ]);
+
+            // ================= ENTREPRISE UNIQUEMENT =================
+            if ($validated['account_type'] === 'entreprise') {
+                try {
+                    $entrepriseRules = [
+                        'project_name' => 'nullable|string|max:255',
+                        'project_description' => 'nullable|string|min:50',
+                        'funding_type_id' => 'nullable|exists:funding_types,id',
+                        'funding_needed' => 'nullable|numeric|min:1000',
+                        'duration' => 'nullable|integer|min:6|max:60',
+                    ];
+
+                    $entrepriseData = $request->validate($entrepriseRules, $messages);
+
+                    Log::info('Validation projet entreprise', $entrepriseData);
+
+                    // Création de la demande de financement uniquement si une offre est sélectionnée
+                    if (!empty($entrepriseData['funding_type_id'])) {
+                        $type = FundingType::find($entrepriseData['funding_type_id']);
+
+                        if ($type) {
+                            $fundingRequest = FundingRequest::create([
+                                'user_id' => $user->id,
+                                'request_number' => $this->generateRequestNumber(),
+                                'funding_type_id' => $type->id,
+                                'title' => $entrepriseData['project_name'] ?? ($type->name . ' - ' . $user->company_name),
+                                'description' => $entrepriseData['project_description'] ?? 'Projet à compléter',
+                                'type' => $type->category ?? 'autre',
+                                'is_predefined' => true,
+                                'amount_requested' => $entrepriseData['funding_needed'] ?? $type->amount ?? 0,
+                                'duration' => $entrepriseData['duration'] ?? 12,
+                                'expected_payment' => $type->registration_fee ?? 0,
+                                'status' => 'pending',
+                                'local_committee_country' => $user->country,
+                                'project_location' => $user->city . ', ' . $user->country,
+                                'expected_jobs' => 0,
+                            ]);
+
+                            Log::info('Demande de financement créée', ['funding_request_id' => $fundingRequest->id]);
+                        }
+                    } else {
+                        Log::info('Aucune offre de financement sélectionnée pour cette entreprise');
+                    }
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    Log::error('ÉCHEC VALIDATION PROJET ENTREPRISE', [
+                        'errors' => $e->errors(),
+                        'user_id' => $user->id
+                    ]);
+                    DB::rollBack();
+                    throw $e;
+                }
+            } else {
+                Log::info('Compte particulier créé sans demande de financement');
+            }
+
+            DB::commit();
+
+            Log::info('INSCRIPTION COMPLÈTE', [
+                'user_id' => $user->id,
+                'type' => $validated['account_type']
+            ]);
+
+            $user->sendEmailVerificationNotification();
+            Auth::login($user);
+
+            return redirect()->route('verification.notice')->with([
+                'success' => 'Inscription réussie ! Veuillez vérifier votre email.',
+                'account_type' => $validated['account_type'],
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('ERREUR CRITIQUE INSCRIPTION', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return back()
+                ->with('error', 'Une erreur est survenue: ' . $e->getMessage())
+                ->withInput();
+        }
     }
-}
     // ============= MÉTHODES AUXILIAIRES =============
     private function generateMemberId()
     {

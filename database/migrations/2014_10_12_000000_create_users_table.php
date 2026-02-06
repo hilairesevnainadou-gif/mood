@@ -64,7 +64,8 @@ return new class extends Migration
             $table->string('member_id')->unique()->nullable(); // BHDM-2024-000001
             $table->date('member_since')->nullable();
             $table->enum('member_status', ['pending', 'active', 'suspended', 'inactive'])->default('pending');
-            $table->enum('member_type', ['particulier', 'entreprise'])->default('particulier');
+            // Dans ta migration create_users_table.php ou une nouvelle migration
+$table->enum('member_type', ['particulier', 'entreprise', 'admin'])->default('particulier');
 
             // Statuts système
             $table->boolean('is_active')->default(true);

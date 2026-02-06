@@ -8,6 +8,22 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    /**
+     * Affiche le formulaire de connexion admin
+     */
+    public function showLoginForm()
+    {
+        // Si déjà connecté en tant qu'admin, rediriger vers le dashboard
+        if (Auth::guard('admin')->check()) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return view('admin.auth.login');
+    }
+
+    /**
+     * Traite la connexion admin
+     */
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -20,7 +36,7 @@ class AuthController extends Controller
         if (Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            return redirect()->route('admin.dashboard');
+            return redirect()->intended(route('admin.dashboard'));
         }
 
         return back()->withErrors([
@@ -28,6 +44,9 @@ class AuthController extends Controller
         ])->onlyInput('email');
     }
 
+    /**
+     * Déconnexion admin
+     */
     public function logout(Request $request)
     {
         Auth::guard('admin')->logout();

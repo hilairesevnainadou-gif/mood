@@ -52,41 +52,62 @@ class FundingPayment extends Model
         'metadata' => 'array'
     ];
 
-    // Relations
+    // ============================================
+    // RELATIONS
+    // ============================================
+
+    /**
+     * Relation avec la demande de financement (alias)
+     */
     public function funding()
     {
         return $this->belongsTo(Funding::class, 'funding_request_id');
     }
 
+    /**
+     * Relation avec la demande de financement (principale)
+     */
     public function fundingRequest()
     {
         return $this->belongsTo(FundingRequest::class, 'funding_request_id');
     }
 
+    /**
+     * Relation avec l'utilisateur créateur
+     */
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    // AJOUTÉ : Relation avec l'admin qui a vérifié
+    /**
+     * Relation avec l'admin qui a vérifié
+     */
     public function verifier()
     {
         return $this->belongsTo(User::class, 'verified_by');
     }
 
-    // Accessors conservés + nouveau pour le motif
+    // ============================================
+    // ACCESSORS
+    // ============================================
+
     public function getFormattedAmountAttribute()
     {
         return number_format($this->amount, 0, ',', ' ') . ' FCFA';
     }
 
-    // AJOUTÉ : Accessor pour afficher le motif formaté
+    /**
+     * Accessor pour afficher le motif formaté
+     */
     public function getFormattedMotifAttribute()
     {
         return $this->payment_motif ? sprintf('%04d', $this->payment_motif) : 'N/A';
     }
 
-    // AJOUTÉ : Label pour le type de paiement
+    /**
+     * Label pour le type de paiement
+     */
     public function getTypeLabelAttribute()
     {
         $labels = [
@@ -114,7 +135,7 @@ class FundingPayment extends Model
     {
         $labels = [
             'pending' => 'En attente de paiement',
-            'processing' => 'En attente de vérification',  // Modifié pour clarté
+            'processing' => 'En attente de vérification',
             'completed' => 'Paiement confirmé',
             'failed' => 'Échoué/rejeté',
             'cancelled' => 'Annulé',
@@ -134,13 +155,17 @@ class FundingPayment extends Model
         return $this->status === 'pending';
     }
 
-    // AJOUTÉ : Vérification si en attente de validation admin
+    /**
+     * Vérification si en attente de validation admin
+     */
     public function getIsProcessingAttribute()
     {
         return $this->status === 'processing';
     }
 
-    // Méthodes d'action modifiées et nouvelles
+    // ============================================
+    // MÉTHODES D'ACTION
+    // ============================================
 
     /**
      * Client confirme avoir payé (via USSD)
@@ -210,7 +235,10 @@ class FundingPayment extends Model
         ]);
     }
 
-    // Génération du numéro de paiement
+    // ============================================
+    // BOOT & GÉNÉRATION DE NUMÉROS
+    // ============================================
+
     protected static function boot()
     {
         parent::boot();
@@ -220,7 +248,7 @@ class FundingPayment extends Model
                 $payment->payment_number = static::generatePaymentNumber();
             }
 
-            // AJOUTÉ : Génération automatique du motif à 4 chiffres si non fourni
+            // Génération automatique du motif à 4 chiffres si non fourni
             if (!$payment->payment_motif && $payment->type === 'registration') {
                 $payment->payment_motif = static::generateUniqueMotif();
             }
@@ -245,7 +273,9 @@ class FundingPayment extends Model
         return $prefix . $datePart . '-' . $nextNumber;
     }
 
-    // AJOUTÉ : Génération du motif unique à 4 chiffres
+    /**
+     * Génération du motif unique à 4 chiffres
+     */
     public static function generateUniqueMotif()
     {
         do {
@@ -257,8 +287,4 @@ class FundingPayment extends Model
         return $motif;
     }
 
-    public function fundingRequest() {
-        return $this->belongsTo(FundingRequest::class);
-    }
-
-}
+} // FIN DE LA CLASSE

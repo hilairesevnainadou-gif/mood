@@ -1,795 +1,612 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion - BHDM</title>
+@extends('layouts.inscription-layout')
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+@section('title', 'Connexion')
+@section('body_class', 'mode-connexion')
 
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+@section('auth_nav_button')
+    <a href="{{ route('register') }}" class="btn-auth-nav">
+        <i class="fas fa-user-plus"></i>
+        <span>Créer un compte</span>
+    </a>
+@endsection
 
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+@section('footer')
+    <!-- Pas de footer en mode connexion -->
+@endsection
 
-    <style>
-        :root {
-            --primary-color: #1b5a8d;
-            --secondary-color: #ff5a58;
-            --accent-color: #4aafff;
-            --dark-color: #0a1f44;
-            --light-color: #f8f9fa;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #0a1f44 0%, #1b5a8d 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            margin: 0;
-            position: relative;
-        }
-
-        .login-container {
-            width: 100%;
-            max-width: 1200px;
-            display: flex;
-            min-height: 700px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            border-radius: 20px;
-            overflow: hidden;
-        }
-
-        .login-left {
-            flex: 1;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 50px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            color: white;
-            position: relative;
-        }
-
-        .login-right {
-            flex: 1;
-            background: white;
-            padding: 50px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .logo-container {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .logo {
-            display: inline-flex;
-            align-items: center;
-            gap: 15px;
-            text-decoration: none;
-            color: white;
-        }
-
-        .logo-img {
-            height: 60px;
-            width: auto;
-            max-width: 200px;
-            object-fit: contain;
-        }
-
-        .logo-text {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: white;
-        }
-
-        .login-title {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: var(--dark-color);
-            margin-bottom: 10px;
-        }
-
-        .login-subtitle {
-            color: #666;
-            font-size: 1.1rem;
-            margin-bottom: 30px;
-        }
-
-        .form-control {
-            padding: 15px 20px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-control:focus {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 3px rgba(74, 175, 255, 0.1);
-        }
-
-        .input-group-text {
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-right: none;
-            border-radius: 10px 0 0 10px;
-        }
-
-        .form-control-with-icon {
-            border-left: none;
-            border-radius: 0 10px 10px 0;
-        }
-
-        .btn-login {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-            border: none;
-            color: white;
-            padding: 15px 30px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            border-radius: 10px;
-            width: 100%;
-            transition: all 0.3s ease;
-        }
-
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(27, 90, 141, 0.3);
-        }
-
-        .btn-login:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-
-        .login-links {
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .login-links a {
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .login-links a:hover {
-            color: var(--secondary-color);
-            text-decoration: underline;
-        }
-
-        .auth-topbar {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.75rem 1.25rem;
-            background: rgba(255, 255, 255, 0.92);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-            z-index: 10;
-        }
-
-        .auth-topbar a {
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .auth-topbar .auth-links {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 0.95rem;
-        }
-
-        .auth-link-chip {
-            padding: 0.35rem 0.85rem;
-            border-radius: 999px;
-            border: 1px solid rgba(27, 90, 141, 0.2);
-            background: rgba(27, 90, 141, 0.08);
-        }
-
-        .feature-list {
-            list-style: none;
-            padding: 0;
-            margin: 40px 0;
-        }
-
-        .feature-list li {
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            font-size: 1.1rem;
-        }
-
-        .feature-list i {
-            color: var(--secondary-color);
-            font-size: 1.5rem;
-        }
-
-        /* Carrousel des témoignages */
-        .testimonial-carousel {
-            margin-top: 40px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 30px;
-        }
-
-        .testimonial-item {
-            text-align: center;
-            padding: 20px;
-        }
-
-        .testimonial-text {
-            font-style: italic;
-            line-height: 1.6;
-            margin-bottom: 20px;
-            font-size: 1.1rem;
-            min-height: 120px;
-        }
-
-        .testimonial-author {
-            font-weight: 600;
-            font-size: 1.1rem;
-        }
-
-        .testimonial-author span {
-            display: block;
-            font-weight: normal;
-            font-size: 0.9rem;
-            opacity: 0.9;
-            margin-top: 5px;
-        }
-
-        .testimonial-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            object-fit: cover;
-            margin-bottom: 15px;
-            border: 3px solid var(--secondary-color);
-        }
-
-        .carousel-indicators {
-            bottom: -40px;
-        }
-
-        .carousel-indicators button {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.5);
-            margin: 0 5px;
-        }
-
-        .carousel-indicators button.active {
-            background-color: var(--secondary-color);
-        }
-
-        .carousel-control-prev,
-        .carousel-control-next {
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            top: 50%;
-            transform: translateY(-50%);
-            opacity: 0.7;
-        }
-
-        .carousel-control-prev:hover,
-        .carousel-control-next:hover {
-            opacity: 1;
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .carousel-control-prev {
-            left: -20px;
-        }
-
-        .carousel-control-next {
-            right: -20px;
-        }
-
-        .alert {
-            border-radius: 10px;
-            border: none;
-            padding: 15px 20px;
-            margin-bottom: 20px;
-        }
-
-        .alert-danger {
-            background: rgba(220, 53, 69, 0.1);
-            color: #dc3545;
-            border-left: 4px solid #dc3545;
-        }
-
-        .alert-success {
-            background: rgba(40, 167, 69, 0.1);
-            color: #28a745;
-            border-left: 4px solid #28a745;
-        }
-
-        .password-toggle {
-            cursor: pointer;
-            padding: 10px;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-
-        .password-toggle:hover {
-            background: #f8f9fa;
-        }
-
-        @media (max-width: 992px) {
-            .login-container {
-                flex-direction: column;
-                max-width: 500px;
-            }
-
-            .login-left {
-                display: none;
-            }
-
-            .login-right {
-                padding: 30px 20px;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .login-right {
-                padding: 20px 15px;
-            }
-
-            .logo-text {
-                font-size: 1.5rem;
-            }
-
-            .login-title {
-                font-size: 1.8rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="auth-topbar">
-        <a href="{{ route('home') }}">
-            <i class="fas fa-arrow-left me-2"></i>Retour au site
-        </a>
-        <div class="auth-links">
-            <span>Pas de compte ?</span>
-            <a href="{{ route('register') }}" class="auth-link-chip">Créer un compte</a>
-        </div>
-    </div>
-    <div class="login-container">
-        <!-- Panneau gauche -->
-        <div class="login-left">
-            <div class="logo-container">
-                <a href="{{ route('home') }}" class="logo">
-                    @if(file_exists(public_path('images/logo.png')))
-                        <img src="{{ asset('images/logo.png') }}" alt="BHDM - Banque Humanitaire du Développement Mondial" class="logo-img">
-                    @else
-                        <!-- Fallback si le logo n'existe pas -->
-                        <div class="logo-text">BHDM</div>
-                        <div style="font-size: 0.8rem; margin-top: 5px;">
-                            Banque Humanitaire du Développement Mondial
-                        </div>
-                    @endif
-                </a>
+@section('content_wrapper')
+<div class="login-container">
+    <!-- Panneau gauche avec fond sombre pour lisibilité -->
+    <div class="login-left-panel">
+        <div class="login-left-content">
+            <!-- Logo -->
+            <div class="login-brand">
+                <div class="login-brand-logo">
+                    <i class="fas fa-hand-holding-heart"></i>
+                </div>
+                <div>
+                    <h2>BHDM</h2>
+                    <p>Banque Humanitaire du Développement Mondial</p>
+                </div>
             </div>
 
-            <h2 class="mb-4">Bienvenue sur votre espace client</h2>
-            <p>Accédez à votre portefeuille digital, gérez vos demandes de financement et suivez vos projets.</p>
+            <!-- Titre principal -->
+            <div class="login-hero">
+                <h1>Bienvenue sur votre espace client</h1>
+                <p>Accédez à votre portefeuille digital, gérez vos demandes de financement et suivez vos projets en temps réel.</p>
+            </div>
 
-            <ul class="feature-list">
-                <li>
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Espace sécurisé et crypté</span>
-                </li>
-                <li>
-                    <i class="fas fa-bolt"></i>
-                    <span>Accès instantané à vos fonds</span>
-                </li>
-                <li>
-                    <i class="fas fa-chart-line"></i>
-                    <span>Suivi en temps réel de vos projets</span>
-                </li>
-                <li>
-                    <i class="fas fa-headset"></i>
-                    <span>Support client dédié</span>
-                </li>
-            </ul>
-
-            <!-- Carrousel des témoignages -->
-            <div class="testimonial-carousel">
-                <div id="testimonialCarousel" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner">
-                        <!-- Témoignage 1 -->
-                        <div class="carousel-item active">
-                            <div class="testimonial-item">
-                                <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80"
-                                     alt="Fatou Diagne" class="testimonial-avatar">
-                                <p class="testimonial-text">
-                                    "Grâce à BHDM, j'ai pu développer mon entreprise de transformation agricole.
-                                    L'interface est intuitive et l'accompagnement exceptionnel."
-                                </p>
-                                <div class="testimonial-author">
-                                    Fatou Diagne
-                                    <span>Entrepreneure, Thiès</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Témoignage 2 -->
-                        <div class="carousel-item">
-                            <div class="testimonial-item">
-                                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80"
-                                     alt="Moussa Diallo" class="testimonial-avatar">
-                                <p class="testimonial-text">
-                                    "Le portefeuille digital m'a permis de gérer mes finances facilement.
-                                    Les transferts sont instantanés et sécurisés."
-                                </p>
-                                <div class="testimonial-author">
-                                    Moussa Diallo
-                                    <span>Artisan, Dakar</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Témoignage 3 -->
-                        <div class="carousel-item">
-                            <div class="testimonial-item">
-                                <img src="https://images.unsplash.com/photo-1494790108755-2616b612b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80"
-                                     alt="Aminata Sarr" class="testimonial-avatar">
-                                <p class="testimonial-text">
-                                    "En tant que femme entrepreneure, BHDM m'a offert les opportunités
-                                    dont j'avais besoin pour faire grandir mon commerce."
-                                </p>
-                                <div class="testimonial-author">
-                                    Aminata Sarr
-                                    <span>Commerçante, Saint-Louis</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Témoignage 4 -->
-                        <div class="carousel-item">
-                            <div class="testimonial-item">
-                                <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80"
-                                     alt="Cheikh Ndiaye" class="testimonial-avatar">
-                                <p class="testimonial-text">
-                                    "La rapidité de traitement des demandes de financement est impressionnante.
-                                    Vraiment une plateforme au service des entrepreneurs."
-                                </p>
-                                <div class="testimonial-author">
-                                    Cheikh Ndiaye
-                                    <span>Agriculteur, Kaolack</span>
-                                </div>
-                            </div>
-                        </div>
+            <!-- Avantages -->
+            <div class="login-features">
+                <div class="feature-item">
+                    <div class="feature-icon bg-success">
+                        <i class="fas fa-shield-alt"></i>
                     </div>
-
-                    <!-- Contrôles du carrousel -->
-                    <button class="carousel-control-prev" type="button" data-bs-target="#testimonialCarousel" data-bs-slide="prev">
-                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Précédent</span>
-                    </button>
-                    <button class="carousel-control-next" type="button" data-bs-target="#testimonialCarousel" data-bs-slide="next">
-                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Suivant</span>
-                    </button>
-
-                    <!-- Indicateurs -->
-                    <div class="carousel-indicators">
-                        <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Témoignage 1"></button>
-                        <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="1" aria-label="Témoignage 2"></button>
-                        <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="2" aria-label="Témoignage 3"></button>
-                        <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="3" aria-label="Témoignage 4"></button>
+                    <div>
+                        <strong>Espace sécurisé</strong>
+                        <span>Connexion cryptée et protégée</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon bg-warning">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <div>
+                        <strong>Accès instantané</strong>
+                        <span>À vos fonds 24h/24, 7j/7</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon bg-info">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div>
+                        <strong>Suivi en temps réel</strong>
+                        <span>De tous vos projets et investissements</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon bg-pink">
+                        <i class="fas fa-headset"></i>
+                    </div>
+                    <div>
+                        <strong>Support dédié</strong>
+                        <span>Une équipe à votre écoute</span>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-4">
-                <p><i class="fas fa-info-circle me-2"></i>Vous êtes nouveau ?
-                    <a href="{{ route('register') }}" class="text-white fw-bold">Créez votre compte</a>
-                </p>
-            </div>
-        </div>
-
-        <!-- Panneau droit (Formulaire) -->
-        <div class="login-right">
-            <div>
-                <h1 class="login-title">Connexion</h1>
-                <p class="login-subtitle">Entrez vos identifiants pour accéder à votre compte</p>
-
-                <!-- Messages d'erreur/succès -->
-                @if(session('error'))
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        {{ session('error') }}
+            <!-- Témoignage -->
+            <div class="login-testimonial">
+                <i class="fas fa-quote-left"></i>
+                <p>"Grâce à BHDM, j'ai pu développer mon entreprise agricole et créer 15 emplois dans ma communauté. Un service exceptionnel !"</p>
+                <div class="testimonial-author">
+                    <i class="fas fa-user-circle"></i>
+                    <div>
+                        <strong>— Fatou Diagne</strong>
+                        <span>Entrepreneure, Thiès</span>
                     </div>
-                @endif
-
-                @if(session('success'))
-                    <div class="alert alert-success">
-                        <i class="fas fa-check-circle me-2"></i>
-                        {{ session('success') }}
-                    </div>
-                @endif
-
-                @if($errors->any())
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        <strong>Erreur d'authentification</strong>
-                        <ul class="mb-0 mt-2">
-                            @foreach($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
-
-                <!-- Formulaire -->
-                <form method="POST" action="{{ route('login.submit') }}" id="loginForm">
-                    @csrf
-
-                    <!-- Email -->
-                    <div class="mb-4">
-                        <label for="email" class="form-label fw-bold mb-2">Adresse email</label>
-                        <div class="input-group">
-                            <span class="input-group-text">
-                                <i class="fas fa-envelope"></i>
-                            </span>
-                            <input type="email"
-                                   class="form-control form-control-with-icon"
-                                   id="email"
-                                   name="email"
-                                   value="{{ old('email') }}"
-                                   placeholder="votre@email.com"
-                                   required
-                                   autocomplete="email"
-                                   autofocus>
-                        </div>
-                    </div>
-
-                    <!-- Mot de passe -->
-                    <div class="mb-4">
-                        <label for="password" class="form-label fw-bold mb-2">Mot de passe</label>
-                        <div class="input-group">
-                            <span class="input-group-text">
-                                <i class="fas fa-lock"></i>
-                            </span>
-                            <input type="password"
-                                   class="form-control form-control-with-icon"
-                                   id="password"
-                                   name="password"
-                                   placeholder="Votre mot de passe"
-                                   required
-                                   autocomplete="current-password">
-                            <span class="input-group-text password-toggle" id="togglePassword">
-                                <i class="fas fa-eye"></i>
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Options -->
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="remember" id="remember">
-                            <label class="form-check-label" for="remember">
-                                Se souvenir de moi
-                            </label>
-                        </div>
-                        <a href="#" class="text-primary" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal">
-                            Mot de passe oublié ?
-                        </a>
-                    </div>
-
-                    <!-- Bouton de connexion -->
-                    <button type="submit" class="btn btn-login mb-4" id="loginButton">
-                        <span id="loginButtonText">
-                            <i class="fas fa-sign-in-alt me-2"></i>
-                            Se connecter
-                        </span>
-                        <span id="loginButtonLoading" style="display: none;">
-                            <i class="fas fa-spinner fa-spin me-2"></i>
-                            Connexion en cours...
-                        </span>
-                    </button>
-
-                    <!-- Lien d'inscription -->
-                    <div class="login-links">
-                        <p>Vous n'avez pas de compte ?
-                            <a href="{{ route('register') }}">Inscrivez-vous gratuitement</a>
-                        </p>
-                    </div>
-                </form>
-
-                <!-- Séparateur -->
-                <div class="position-relative my-4">
-                    <hr>
-                    <div class="position-absolute top-50 start-50 translate-middle bg-white px-3">
-                        <span class="text-muted">ou</span>
-                    </div>
-                </div>
-
-                <!-- Retour à l'accueil -->
-                <div class="text-center">
-                    <a href="{{ route('home') }}" class="btn btn-outline-primary">
-                        <i class="fas fa-home me-2"></i>
-                        Retour à l'accueil
-                    </a>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal Mot de passe oublié -->
-    <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="fas fa-key me-2"></i>
-                        Réinitialisation du mot de passe
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Entrez votre adresse email pour recevoir un lien de réinitialisation.</p>
-                    <form id="forgotPasswordForm">
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" class="form-control" placeholder="votre@email.com" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="submit" form="forgotPasswordForm" class="btn btn-primary">
-                        <i class="fas fa-paper-plane me-2"></i>
-                        Envoyer le lien
-                    </button>
+    <!-- Panneau droit avec formulaire -->
+    <div class="login-right-panel">
+        <div class="login-form-box">
+            <!-- Header mobile -->
+            <div class="mobile-header d-lg-none">
+                <div class="mobile-logo">
+                    <i class="fas fa-hand-holding-heart"></i>
+                    <span>BHDM</span>
                 </div>
             </div>
+
+            <div class="form-header">
+                <h2>Connexion</h2>
+                <p>Entrez vos identifiants pour accéder à votre compte</p>
+            </div>
+
+            <!-- Messages -->
+            @if(session('error'))
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
+                </div>
+            @endif
+
+            @if(session('success'))
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div class="alert alert-danger">
+                    <ul class="mb-0">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <form method="POST" action="{{ route('login.submit') }}" id="loginForm">
+                @csrf
+
+                <div class="mb-3">
+                    <label class="form-label">Adresse email</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-envelope text-muted"></i></span>
+                        <input type="email" name="email" value="{{ old('email') }}"
+                               class="form-control" placeholder="votre@email.com" required autofocus>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Mot de passe</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-lock text-muted"></i></span>
+                        <input type="password" name="password" id="password"
+                               class="form-control" placeholder="Votre mot de passe" required>
+                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword()">
+                            <i class="fas fa-eye" id="toggleIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="remember" id="remember">
+                        <label class="form-check-label" for="remember">Se souvenir de moi</label>
+                    </div>
+                    <a href="{{ route('password.forgot') }}" class="text-decoration-none">Mot de passe oublié ?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 btn-login" id="loginBtn">
+                    <span class="btn-normal"><i class="fas fa-sign-in-alt me-2"></i>Se connecter</span>
+                    <span class="btn-loading" style="display: none;"><i class="fas fa-spinner fa-spin me-2"></i>Connexion...</span>
+                </button>
+            </form>
+
+            <div class="divider"><span>ou</span></div>
+
+            <a href="{{ route('register') }}" class="btn btn-outline-secondary w-100 mb-3">
+                <i class="fas fa-user-plus me-2"></i>Créer un compte gratuitement
+            </a>
+
+            <a href="{{ route('home') }}" class="btn btn-link w-100 text-decoration-none">
+                <i class="fas fa-arrow-left me-2"></i>Retour à l'accueil
+            </a>
         </div>
     </div>
+</div>
+@endsection
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+@push('scripts')
+<script>
+function togglePassword() {
+    const input = document.getElementById('password');
+    const icon = document.getElementById('toggleIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Afficher/masquer le mot de passe
-            const togglePassword = document.getElementById('togglePassword');
-            const passwordInput = document.getElementById('password');
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    const btn = document.getElementById('loginBtn');
+    btn.querySelector('.btn-normal').style.display = 'none';
+    btn.querySelector('.btn-loading').style.display = 'inline';
+    btn.disabled = true;
+});
 
-            if (togglePassword && passwordInput) {
-                togglePassword.addEventListener('click', function() {
-                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                    passwordInput.setAttribute('type', type);
+@auth
+    window.location.href = '{{ route("client.dashboard") }}';
+@endauth
+</script>
+@endpush
 
-                    // Changer l'icône
-                    const icon = this.querySelector('i');
-                    if (type === 'text') {
-                        icon.classList.remove('fa-eye');
-                        icon.classList.add('fa-eye-slash');
-                    } else {
-                        icon.classList.remove('fa-eye-slash');
-                        icon.classList.add('fa-eye');
-                    }
-                });
-            }
+@push('styles')
+<style>
+/* ============================================
+   STYLES SPÉCIFIQUES LOGIN - À AJOUTER AU LAYOUT
+   ============================================ */
 
-            // Gestion du formulaire de connexion
-            const loginForm = document.getElementById('loginForm');
-            const loginButton = document.getElementById('loginButton');
-            const loginButtonText = document.getElementById('loginButtonText');
-            const loginButtonLoading = document.getElementById('loginButtonLoading');
+/* Override pour le mode connexion */
+body.mode-connexion {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
 
-            if (loginForm) {
-                loginForm.addEventListener('submit', function(e) {
-                    // Désactiver le bouton pendant la soumission
-                    loginButton.disabled = true;
-                    loginButtonText.style.display = 'none';
-                    loginButtonLoading.style.display = 'inline';
-                });
-            }
+body.mode-connexion .auth-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    margin: 20px;
+    width: calc(100% - 40px);
+    position: relative;
+    top: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
 
-            // Gestion du formulaire mot de passe oublié
-            const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+/* Conteneur principal login */
+.login-container {
+    flex: 1;
+    display: flex;
+    width: 100%;
+    max-width: 1200px;
+    min-height: 650px;
+    margin: 20px auto;
+    background: white;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+}
 
-            if (forgotPasswordForm) {
-                forgotPasswordForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
+/* Panneau gauche - FOND SOMBRE OPAQUE pour lisibilité */
+.login-left-panel {
+    flex: 1;
+    background: linear-gradient(160deg, #0a1f44 0%, #1b5a8d 50%, #0d2b4e 100%);
+    padding: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: white;
+    position: relative;
+}
 
-                    const email = this.querySelector('input[type="email"]').value;
+/* Effet décoratif subtil */
+.login-left-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.4;
+}
 
-                    // Fermer le modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('forgotPasswordModal'));
-                    modal.hide();
+.login-left-content {
+    position: relative;
+    z-index: 1;
+}
 
-                    // Afficher un message (simulation)
-                    showToast('Un lien de réinitialisation a été envoyé à ' + email, 'info');
-                });
-            }
+/* Brand */
+.login-brand {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 40px;
+}
 
-            // Auto-focus sur l'email
-            const emailInput = document.getElementById('email');
-            if (emailInput) {
-                emailInput.focus();
-            }
+.login-brand-logo {
+    width: 60px;
+    height: 60px;
+    background: white;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bh-primary);
+    font-size: 1.8rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
 
-            // Auto-rotation du carrousel
-            const testimonialCarousel = document.getElementById('testimonialCarousel');
-            if (testimonialCarousel) {
-                const carousel = new bootstrap.Carousel(testimonialCarousel, {
-                    interval: 5000, // Change toutes les 5 secondes
-                    ride: 'carousel',
-                    wrap: true
-                });
-            }
+.login-brand h2 {
+    font-family: var(--bh-font-heading);
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0;
+    color: white;
+}
 
-            // Fonction pour afficher des toasts
-            function showToast(message, type = 'info') {
-                // Créer un toast
-                const toastEl = document.createElement('div');
-                toastEl.className = `toast align-items-center text-bg-${type} border-0`;
-                toastEl.setAttribute('role', 'alert');
-                toastEl.setAttribute('aria-live', 'assertive');
-                toastEl.setAttribute('aria-atomic', 'true');
+.login-brand p {
+    font-size: 0.85rem;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+}
 
-                toastEl.innerHTML = `
-                    <div class="d-flex">
-                        <div class="toast-body">
-                            <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>
-                            ${message}
-                        </div>
-                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                    </div>
-                `;
+/* Hero section */
+.login-hero {
+    margin-bottom: 35px;
+}
 
-                // Style de position
-                toastEl.style.position = 'fixed';
-                toastEl.style.top = '20px';
-                toastEl.style.right = '20px';
-                toastEl.style.zIndex = '9999';
+.login-hero h1 {
+    font-family: var(--bh-font-heading);
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 15px;
+    color: white;
+}
 
-                document.body.appendChild(toastEl);
+.login-hero p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.85);
+    max-width: 90%;
+}
 
-                // Initialiser et montrer le toast
-                const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
-                toast.show();
+/* Features */
+.login-features {
+    margin-bottom: 35px;
+}
 
-                // Nettoyer après la fermeture
-                toastEl.addEventListener('hidden.bs.toast', function() {
-                    this.remove();
-                });
-            }
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 18px;
+    color: white;
+}
 
-            // Vérifier si l'utilisateur est déjà connecté
-            @auth
-                window.location.href = '{{ route("client.dashboard") }}';
-            @endauth
-        });
-    </script>
-</body>
-</html>
+.feature-icon {
+    width: 45px;
+    height: 45px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.feature-icon.bg-success { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+.feature-icon.bg-warning { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+.feature-icon.bg-info { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+.feature-icon.bg-pink { background: rgba(244, 114, 182, 0.2); color: #f472b6; }
+
+.feature-item strong {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: white;
+}
+
+.feature-item span {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+/* Testimonial */
+.login-testimonial {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 16px;
+    padding: 25px;
+    border-left: 4px solid var(--bh-accent);
+}
+
+.login-testimonial > i {
+    color: var(--bh-accent);
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    opacity: 0.7;
+}
+
+.login-testimonial p {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.95);
+    font-style: italic;
+    margin-bottom: 15px;
+}
+
+.testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.testimonial-author i {
+    font-size: 2rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.testimonial-author div {
+    display: flex;
+    flex-direction: column;
+}
+
+.testimonial-author strong {
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.testimonial-author span {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85rem;
+}
+
+/* Panneau droit */
+.login-right-panel {
+    flex: 1;
+    background: #ffffff;
+    padding: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-form-box {
+    width: 100%;
+    max-width: 400px;
+}
+
+/* Mobile header */
+.mobile-header {
+    text-align: center;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.mobile-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--bh-primary);
+}
+
+.mobile-logo i {
+    width: 45px;
+    height: 45px;
+    background: linear-gradient(135deg, var(--bh-primary) 0%, var(--bh-primary-light) 100%);
+    color: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Form header */
+.form-header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.form-header h2 {
+    font-family: var(--bh-font-heading);
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--bh-primary-dark);
+    margin-bottom: 8px;
+}
+
+.form-header p {
+    color: #6b7280;
+    margin: 0;
+}
+
+/* Formulaire */
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+}
+
+.input-group-text {
+    background: #f9fafb;
+    border: 2px solid #e5e7eb;
+    border-right: none;
+    padding: 12px 15px;
+}
+
+.form-control {
+    border: 2px solid #e5e7eb;
+    border-left: none;
+    padding: 12px 15px;
+    font-size: 1rem;
+}
+
+.form-control:focus {
+    border-color: var(--bh-primary);
+    box-shadow: none;
+}
+
+.btn-login {
+    background: linear-gradient(135deg, var(--bh-primary) 0%, var(--bh-primary-light) 100%);
+    border: none;
+    padding: 14px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(27, 90, 141, 0.3);
+}
+
+.btn-login:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(27, 90, 141, 0.4);
+}
+
+/* Divider */
+.divider {
+    display: flex;
+    align-items: center;
+    margin: 25px 0;
+    color: #9ca3af;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.divider span {
+    padding: 0 15px;
+    font-size: 0.9rem;
+}
+
+/* Alertes */
+.alert {
+    border-radius: 10px;
+    border: none;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+}
+
+.alert-danger {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.alert-success {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    body.mode-connexion .auth-header {
+        margin: 10px;
+        width: calc(100% - 20px);
+    }
+
+    .login-container {
+        flex-direction: column;
+        max-width: 450px;
+        margin: 10px auto;
+        min-height: auto;
+    }
+
+    .login-left-panel {
+        display: none;
+    }
+
+    .login-right-panel {
+        padding: 30px 25px;
+    }
+}
+
+@media (max-width: 576px) {
+    .login-right-panel {
+        padding: 25px 20px;
+    }
+
+    .form-header h2 {
+        font-size: 1.6rem;
+    }
+}
+
+.d-lg-none {
+    display: none;
+}
+
+@media (max-width: 992px) {
+    .d-lg-none {
+        display: block !important;
+    }
+}
+</style>
+@endpush
