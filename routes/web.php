@@ -20,18 +20,21 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
 use App\Http\Controllers\Admin\SupportController as AdminSupportController;
+use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
+use App\Http\Controllers\Admin\FundingValidationController;
+
 use App\Http\Controllers\Api\ProgramController;
 use App\Http\Controllers\Api\WalletController as ApiWalletController;
 
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use App\Http\Controllers\Client\RequestFundingController;
-use App\Http\Controllers\Admin\FundingValidationController;
-use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
+use App\Http\Controllers\Client\ProfileController;
+use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
 use App\Http\Controllers\Client\DocumentController as ClientDocumentController;
 
 /*
 |--------------------------------------------------------------------------
-| Routes publiques (Site institutionnel)
+| Public Routes (Institutional Website)
 |--------------------------------------------------------------------------
 */
 
@@ -39,11 +42,11 @@ Route::get('/', function () {
     return view('home');
 })->name('home');
 
-Route::get('/a-propos', function () {
+Route::get('/about', function () {
     return view('about');
 })->name('about');
 
-Route::get('/nos-services', function () {
+Route::get('/services', function () {
     return view('services');
 })->name('services');
 
@@ -59,45 +62,58 @@ Route::get('/services/{service}', function ($service) {
 
 /*
 |--------------------------------------------------------------------------
-| Routes d'authentification Client
+| Client Authentication Routes (Public)
 |--------------------------------------------------------------------------
 */
 
-// Connexion
-Route::get('/connexion', function () {
+// Login
+Route::get('/login', function () {
     return view('auth.login');
 })->name('login');
 
-Route::post('/connexion', [ClientController::class, 'login'])->name('login.submit');
+Route::post('/login', [ClientController::class, 'login'])->name('login.submit');
 
-// Inscription
-Route::get('/inscription', [ClientController::class, 'showRegisterForm'])->name('register');
+// Registration
+Route::get('/register', [ClientController::class, 'showRegisterForm'])->name('register');
+Route::post('/register', [ClientController::class, 'register'])->name('register.submit');
 
-Route::post('/inscription', [ClientController::class, 'register'])->name('register.submit');
-
-// Mot de passe oublié
-Route::get('/mot-de-passe-oublie', function () {
+// Forgot Password
+Route::get('/forgot-password', function () {
     return view('auth.forgot-password');
 })->name('password.forgot');
 
-Route::post('/mot-de-passe-oublie', [ClientController::class, 'sendResetLink'])->name('password.email');
+Route::post('/forgot-password', [ClientController::class, 'sendResetLink'])->name('password.email');
 
-// Réinitialisation
-Route::get('/reinitialisation/{token}', function ($token) {
-    return view('auth.reset-password', ['token' => $token]);
+// Reset Password
+// Reset Password 
+Route::get('/reset/{token}', function ($token) {
+    // Récupérer l'email depuis l'URL (?email=...)
+    $email = request('email');
+    
+    // Log pour débogage
+    \Log::info('Affichage formulaire reset', [
+        'token' => $token,
+        'email' => $email,
+        'full_url' => request()->fullUrl()
+    ]);
+    
+    return view('auth.reset-password', [
+        'token' => $token,
+        'email' => $email // ✅ Passer l'email à la vue
+    ]);
 })->name('password.reset');
 
-Route::post('/reinitialisation', [ClientController::class, 'resetPassword'])->name('password.update');
+Route::post('/reset', [ClientController::class, 'resetPassword'])->name('password.update');
 
-// Confirmation de mot de passe
-Route::get('/confirmer-mot-de-passe', function () {
+// Confirm Password
+Route::get('/confirm-password', function () {
     return view('auth.confirm-password');
 })->middleware('auth')->name('password.confirm');
 
-Route::post('/confirmer-mot-de-passe', function (Request $request) {
+Route::post('/confirm-password', function (Request $request) {
     if (!Hash::check($request->password, $request->user()->password)) {
         return back()->withErrors([
-            'password' => ['Le mot de passe fourni est incorrect.']
+            'password' => ['The provided password is incorrect.']
         ]);
     }
 
@@ -105,76 +121,76 @@ Route::post('/confirmer-mot-de-passe', function (Request $request) {
     return redirect()->intended();
 })->middleware(['auth', 'throttle:6,1'])->name('password.confirm.post');
 
-// Déconnexion globale
-Route::post('/deconnexion', [ClientController::class, 'logout'])->name('logout');
+// Global Logout - SINGLE SOURCE OF TRUTH
+Route::post('/logout', [ClientController::class, 'logout'])->name('logout');
 
-// Email verification
+// Email Verification
 Route::middleware(['auth'])->group(function () {
-    Route::get('/email/verifier', function () {
+    Route::get('/email/verify', function () {
         return view('auth.verify-email');
     })->name('verification.notice');
 
-    Route::get('/email/verifier/{id}/{hash}', function (EmailVerificationRequest $request) {
+    Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
         $request->fulfill();
         return redirect()->route('client.documents.index')
-            ->with('success', 'Email vérifié ! Veuillez maintenant télécharger vos documents.');
+            ->with('success', 'Email verified! Please upload your documents now.');
     })->middleware(['signed'])->name('verification.verify');
 
     Route::post('/email/verification-notification', function (Request $request) {
         $request->user()->sendEmailVerificationNotification();
-        return back()->with('message', 'Un nouveau lien de vérification a été envoyé à votre adresse email.');
+        return back()->with('message', 'A new verification link has been sent to your email address.');
     })->middleware(['throttle:6,1'])->name('verification.send');
 });
 
 /*
 |--------------------------------------------------------------------------
-| Routes du processus de demande
+| Application Process Routes
 |--------------------------------------------------------------------------
 */
 
-Route::get('/creer-portefeuille', function () {
+Route::get('/create-wallet', function () {
     return view('wallet.create');
 })->name('wallet.create');
 
-Route::get('/test-evaluation', function () {
+Route::get('/evaluation-test', function () {
     return view('evaluation.test');
 })->name('evaluation.test');
 
-Route::post('/soumettre-test', [ClientController::class, 'submitTest'])->name('evaluation.submit');
+Route::post('/submit-test', [ClientController::class, 'submitTest'])->name('evaluation.submit');
 
 Route::get('/questionnaire', function () {
     return view('questionnaire.form');
 })->name('questionnaire');
 
-Route::post('/soumettre-questionnaire', [ClientController::class, 'submitQuestionnaire'])->name('questionnaire.submit');
+Route::post('/submit-questionnaire', [ClientController::class, 'submitQuestionnaire'])->name('questionnaire.submit');
 
 /*
 |--------------------------------------------------------------------------
-| Routes des programmes
+| Program Routes
 |--------------------------------------------------------------------------
 */
 
-Route::get('/programmes/subventions', function () {
+Route::get('/programs/grants', function () {
     return view('programs.grants');
 })->name('programs.grants');
 
-Route::get('/programmes/financement', function () {
+Route::get('/programs/funding', function () {
     return view('programs.funding');
 })->name('programs.funding');
 
-Route::get('/programmes/formation', function () {
+Route::get('/programs/training', function () {
     return view('programs.training');
 })->name('programs.training');
 
-Route::get('/programmes/assistance', function () {
+Route::get('/programs/assistance', function () {
     return view('programs.assistance');
 })->name('programs.assistance');
 
-Route::get('/postuler/{program}', [ClientController::class, 'apply'])->name('programs.apply');
+Route::get('/apply/{program}', [ClientController::class, 'apply'])->name('programs.apply');
 
 /*
 |--------------------------------------------------------------------------
-| Routes API SSE & Service Worker
+| API SSE & Service Worker Routes
 |--------------------------------------------------------------------------
 */
 
@@ -197,151 +213,171 @@ Route::get('/funding/check-updates', [WalletController::class, 'checkFundingUpda
 
 /*
 |--------------------------------------------------------------------------
-| Routes protégées de l'espace client
+| KKIPAY CALLBACK - ROUTES PUBLIQUES (hors auth et hors CSRF)
+|--------------------------------------------------------------------------
+
+
+*/
+
+// Callback pour les demandes de financement
+Route::post('/kkiapay/callback', [RequestFundingController::class, 'kkiapayCallback'])
+    ->name('kkiapay.callback');
+
+// Callback pour les dépôts wallet - SANS middleware web (pas de CSRF)
+Route::withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class])
+    ->post('/wallet/deposit/callback', [WalletController::class, 'depositCallback'])
+    ->name('client.wallet.deposit.callback');
+
+/*
+|--------------------------------------------------------------------------
+| Session Check API (pour vérifier l'état de la session)
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/api/session-check', function () {
+    return response()->json([
+        'authenticated' => auth()->check(),
+        'user_id' => auth()->id(),
+        'session_id' => session()->getId(),
+        'csrf_token' => csrf_token()
+    ]);
+})->middleware('web');
+
+/*
+|--------------------------------------------------------------------------
+| Protected Client Portal Routes
 |--------------------------------------------------------------------------
 */
 
 Route::middleware(['auth', 'verified'])->prefix('client')->name('client.')->group(function () {
 
     // Dashboard
-    Route::get('/dashboard', [ClientController::class, 'dashboard'])->name('dashboard');
+    Route::get('/dashboard', [ClientDashboardController::class, 'dashboard'])->name('dashboard');
 
-    // DEMANDES DE FINANCEMENT
-    Route::prefix('demandes')->name('requests.')->middleware('profile.documents.validated')->group(function () {
-        Route::get('/', [RequestFundingController::class, 'index'])->name('index');
-        Route::get('/nouvelle', [RequestFundingController::class, 'create'])->name('create');
-        Route::post('/', [RequestFundingController::class, 'store'])->name('store');
+    // Funding Requests
+    Route::prefix('requests')
+        ->name('requests.')
+        ->middleware('profile.documents.validated')
+        ->group(function () {
 
-        Route::get('/{id}/paiement', [RequestFundingController::class, 'paymentPage'])
-            ->name('payment')
-            ->where('id', '[0-9]+');
+            Route::get('/', [RequestFundingController::class, 'index'])->name('index');
+            Route::get('/create', [RequestFundingController::class, 'create'])->name('create');
+            Route::post('/', [RequestFundingController::class, 'store'])->name('store');
+            Route::get('/{id}', [RequestFundingController::class, 'show'])->name('show')->where('id', '[0-9]+');
+            Route::delete('/{id}/cancel', [RequestFundingController::class, 'cancel'])->name('cancel')->where('id', '[0-9]+');
+            Route::get('/{id}/payment', [RequestFundingController::class, 'paymentPage'])->name('payment')->where('id', '[0-9]+');
+            Route::post('/{id}/payment', [RequestFundingController::class, 'processCustomPayment'])->name('payment.process')->where('id', '[0-9]+');
+        });
 
-        Route::post('/{id}/paiement/confirmer', [RequestFundingController::class, 'confirmPayment'])
-            ->name('payment.confirm')
-            ->where('id', '[0-9]+');
+    // Wallet - Routes protégées (SANS le callback qui est publique)
+    Route::prefix('wallet')->name('wallet.')->middleware('profile.documents.validated')->group(function () {
 
-        Route::post('/{id}/documents', [RequestFundingController::class, 'uploadDocuments'])
-            ->name('documents.upload')
-            ->where('id', '[0-9]+');
-
-        Route::post('/{id}/transfert', [RequestFundingController::class, 'initiateTransfer'])
-            ->name('transfer')
-            ->where('id', '[0-9]+');
-
-        Route::get('/{id}', [RequestFundingController::class, 'show'])
-            ->name('show')
-            ->where('id', '[0-9]+');
-    });
-
-    // Portefeuille
-    Route::prefix('portefeuille')->name('wallet.')->middleware('profile.documents.validated')->group(function () {
+        // Page principale
         Route::get('/', [WalletController::class, 'wallet'])->name('index');
+
+        // Historique des transactions
         Route::get('/transactions', [WalletController::class, 'transactions'])->name('transactions');
+
+        // Dépôt via Kkiapay - Initialisation uniquement
         Route::post('/deposit', [WalletController::class, 'deposit'])->name('deposit');
+        // PAS de callback ici, il est en dehors du groupe auth
+
+        // Retrait
         Route::post('/withdraw', [WalletController::class, 'withdraw'])->name('withdraw');
+
+        // Transfert
         Route::post('/transfer', [WalletController::class, 'transfer'])->name('transfer');
-        Route::post('/set-pin', [WalletController::class, 'setWalletPin'])->name('set-pin');
-        Route::post('/verify-pin', [WalletController::class, 'verifyWalletPin'])->name('verify-pin');
 
-        // Callbacks Lygos
-        Route::post('/deposit/callback', [WalletController::class, 'depositCallback'])->name('deposit.callback');
-        Route::post('/withdraw/callback', [WalletController::class, 'withdrawCallback'])->name('withdraw.callback');
+        // Gestion du PIN
+        Route::post('/set-pin', [WalletController::class, 'setPin'])->name('set-pin');
+        Route::post('/verify-pin', [WalletController::class, 'verifyPin'])->name('verify-pin');
 
-        // Financements
+        // API infos
+        Route::get('/get-info', [WalletController::class, 'getWalletInfo'])->name('get-info');
+
+        // API financements
+        Route::get('/check-funding-updates', [WalletController::class, 'checkFundingUpdates'])->name('funding.check');
         Route::get('/funding/{id}/details', [WalletController::class, 'fundingDetails'])->name('funding.details');
         Route::post('/funding/{id}/credit', [WalletController::class, 'creditFunding'])->name('funding.credit');
-        Route::get('/funding/check-updates', [WalletController::class, 'checkFundingUpdates'])->name('funding.check-updates');
 
-        // Vérification de wallet
-        Route::post('/check-wallet', [WalletController::class, 'checkWallet'])->name('check-wallet');
-        Route::get('/get-info', [WalletController::class, 'getWalletInfo'])->name('get-info');
+        // Actions rapides
         Route::get('/quick-actions', [WalletController::class, 'getQuickActions'])->name('quick-actions');
     });
 
-    // Profil utilisateur
-    Route::get('/profile', [ClientController::class, 'profile'])->name('profile');
-    Route::put('/profile', [ClientController::class, 'updateProfile'])->name('profile.update');
-    Route::post('/profile/password', [ClientController::class, 'changePassword'])->name('profile.password');
-    Route::delete('/profile/photo', [ClientController::class, 'removePhoto'])->name('profile.photo.remove');
+    // User Profile
+    Route::get('/profile', [ProfileController::class, 'profile'])->name('profile');
+    Route::put('/profile', [ProfileController::class, 'updateProfile'])->name('profile.update');
+    Route::post('/profile/password', [ProfileController::class, 'changePassword'])->name('profile.password');
+    Route::delete('/profile/photo', [ProfileController::class, 'removePhoto'])->name('profile.photo.remove');
 
-    // Routes pour les documents
+    // Document Routes
     Route::prefix('documents')->name('documents.')->group(function () {
         Route::get('/', [ClientDocumentController::class, 'index'])->name('index');
         Route::get('/upload', [ClientDocumentController::class, 'uploadForm'])->name('upload.form');
         Route::post('/upload', [ClientDocumentController::class, 'uploadDocument'])->name('upload');
-        Route::get('/{id}/view', [ClientDocumentController::class, 'viewDocumentPage'])->name('view.page');
-        Route::get('/{id}/download', [ClientDocumentController::class, 'downloadDocument'])->name('download');
-        Route::get('/{id}/view-direct', [ClientDocumentController::class, 'viewDocument'])->name('view.direct');
-        Route::delete('/{id}', [ClientDocumentController::class, 'deleteDocument'])->name('delete');
-        Route::get('/{id}/view-url', [ClientDocumentController::class, 'viewDocumentUrl'])->name('view.url');
-        Route::patch('/{id}/description', [ClientDocumentController::class, 'updateDescription'])->name('update.description');
-        Route::patch('/{id}/expiry-date', [ClientDocumentController::class, 'updateExpiryDate'])->name('update.expiry');
-        Route::post('/{id}/renew', [ClientDocumentController::class, 'renewDocument'])->name('renew');
-        Route::get('/{id}/status', [ClientDocumentController::class, 'checkDocumentStatus'])->name('status');
+        Route::get('/{id}/view', [ClientDocumentController::class, 'viewDocumentPage'])->name('view.page')->where('id', '[0-9]+');
+        Route::get('/{id}/download', [ClientDocumentController::class, 'downloadDocument'])->name('download')->where('id', '[0-9]+');
+        Route::get('/{id}/view-direct', [ClientDocumentController::class, 'viewDocument'])->name('view.direct')->where('id', '[0-9]+');
+        Route::delete('/{id}', [ClientDocumentController::class, 'deleteDocument'])->name('delete')->where('id', '[0-9]+');
+        Route::get('/{id}/view-url', [ClientDocumentController::class, 'viewDocumentUrl'])->name('view.url')->where('id', '[0-9]+');
+        Route::patch('/{id}/description', [ClientDocumentController::class, 'updateDescription'])->name('update.description')->where('id', '[0-9]+');
+        Route::patch('/{id}/expiry-date', [ClientDocumentController::class, 'updateExpiryDate'])->name('update.expiry')->where('id', '[0-9]+');
+        Route::post('/{id}/renew', [ClientDocumentController::class, 'renewDocument'])->name('renew')->where('id', '[0-9]+');
+        Route::get('/{id}/status', [ClientDocumentController::class, 'checkDocumentStatus'])->name('status')->where('id', '[0-9]+');
         Route::get('/stats', [ClientDocumentController::class, 'getStats'])->name('stats');
-
-        // API routes
         Route::get('/api/list', [ClientDocumentController::class, 'apiIndex'])->name('api.index');
     });
 
-    // Formations
+    // Training
     Route::middleware('profile.documents.validated')->group(function () {
-        Route::get('/formations', [ClientController::class, 'trainings'])->name('trainings');
-        Route::get('/formations/{id}', [ClientController::class, 'trainingDetail'])->name('trainings.detail');
-        Route::post('/formations/{id}/inscription', [ClientController::class, 'enrollTraining'])->name('trainings.enroll');
-        Route::get('/formations/mes-cours', [ClientController::class, 'myTrainings'])->name('trainings.my');
+        Route::get('/training', [ClientController::class, 'trainings'])->name('trainings');
+        Route::get('/training/{id}', [ClientController::class, 'trainingDetail'])->name('trainings.detail');
+        Route::post('/training/{id}/enroll', [ClientController::class, 'enrollTraining'])->name('trainings.enroll');
+        Route::get('/training/my-courses', [ClientController::class, 'myTrainings'])->name('trainings.my');
     });
 
-    // Support Client
+    // Support
     Route::prefix('support')->name('support.')->group(function () {
         Route::get('/', [ClientController::class, 'support'])->name('index');
-        Route::get('/creer', [ClientController::class, 'createSupport'])->name('create');
+        Route::get('/create', [ClientController::class, 'createSupport'])->name('create');
         Route::post('/', [ClientController::class, 'submitSupport'])->name('submit');
         Route::get('/{id}', [ClientController::class, 'showTicket'])->name('show');
-        Route::post('/{id}/repondre', [ClientController::class, 'replyTicket'])->name('reply');
-        Route::post('/{id}/fermer', [ClientController::class, 'closeTicket'])->name('close');
-        Route::post('/{id}/reouvrir', [ClientController::class, 'reopenTicket'])->name('reopen');
-        Route::post('/{id}/marquer-lu', [ClientController::class, 'markTicketAsRead'])->name('mark-read');
-        Route::delete('/{id}', [ClientController::class, 'deleteTicket'])->name('delete');
-
+        Route::post('/{id}/reply', [ClientController::class, 'replyTicket'])->name('reply');
+        Route::post('/{id}/close', [ClientController::class, 'closeTicket'])->name('close');
+        Route::post('/{id}/reopen', [ClientController::class, 'reopenTicket'])->name('reopen');
+        Route::post('/{id}/mark-read', [ClientController::class, 'markTicketAsRead'])->name('mark-read');
+        Route::delete('/{id}', [ClientController::class, 'deleteTicket'])->name('destroy');
         Route::get('/{ticketId}/attachment/{messageId}/{attachmentIndex}', [ClientController::class, 'downloadAttachment'])
             ->where(['ticketId' => '[0-9]+', 'messageId' => '[0-9]+', 'attachmentIndex' => '[0-9]+'])
             ->name('download-attachment');
-
         Route::get('/stats', [ClientController::class, 'getTicketStats'])->name('stats');
-        Route::get('/rechercher', [ClientController::class, 'searchTickets'])->name('search');
+        Route::get('/search', [ClientController::class, 'searchTickets'])->name('search');
     });
 
     // Notifications
     Route::prefix('notifications')->name('notifications.')->group(function () {
         Route::get('/', [ClientController::class, 'notifications'])->name('index');
-        Route::post('/{id}/lire', [ClientController::class, 'markNotificationAsRead'])->name('read');
-        Route::post('/tout-lire', [ClientController::class, 'markAllNotificationsAsRead'])->name('read-all');
+        Route::post('/{id}/read', [ClientController::class, 'markNotificationAsRead'])->name('read');
+        Route::post('/read-all', [ClientController::class, 'markAllNotificationsAsRead'])->name('read-all');
         Route::delete('/{id}', [ClientController::class, 'deleteNotification'])->name('delete');
         Route::get('/list', [ClientController::class, 'listNotifications'])->name('list');
     });
 
-    // Paramètres
-    Route::get('/parametres', [ClientController::class, 'settings'])->name('settings');
-    Route::put('/parametres', [ClientController::class, 'updateSettings'])->name('settings.update');
+    // Settings
+    Route::get('/settings', [ClientController::class, 'settings'])->name('settings');
+    Route::put('/settings', [ClientController::class, 'updateSettings'])->name('settings.update');
 
-    // Déconnexion client
-    Route::post('/deconnexion', function (Request $request) {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-        return redirect('/connexion')->with('success', 'Vous avez été déconnecté avec succès.');
-    })->name('logout');
-
-    // API Client
+    // Client API
     Route::prefix('api')->name('api.')->group(function () {
-        Route::get('/nouvelles-notifications', [ClientController::class, 'checkNewNotifications'])->name('notifications.check');
-        Route::get('/statistiques', [ClientController::class, 'getStats'])->name('stats');
-        Route::get('/verifier-permission', [ClientController::class, 'checkPermission'])->name('check-permission');
+        Route::get('/new-notifications', [ClientController::class, 'checkNewNotifications'])->name('notifications.check');
+        Route::get('/statistics', [ClientController::class, 'getStats'])->name('stats');
+        Route::get('/check-permission', [ClientController::class, 'checkPermission'])->name('check-permission');
     });
+    
+    // PAS DE ROUTE LOGOUT ICI - utilise la route globale /logout
 });
 
-// Route pour vérifier le statut de vérification d'email
+// Email Verification Status Route
 Route::get('/api/user/verification-status', function () {
     return response()->json([
         'verified' => auth()->check() && auth()->user()->hasVerifiedEmail(),
@@ -351,26 +387,26 @@ Route::get('/api/user/verification-status', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Routes administratives
+| Admin Routes
 |--------------------------------------------------------------------------
 */
 
 Route::prefix('admin')->name('admin.')->group(function () {
 
     // ============================================================
-    // ROUTES PUBLIQUES (Non authentifiées)
+    // PUBLIC ROUTES (Unauthenticated)
     // ============================================================
 
-    // Login GET - Afficher le formulaire
-    Route::get('/connexion', [AuthController::class, 'showLoginForm'])
+    // Login GET - Display Form
+    Route::get('/login', [AuthController::class, 'showLoginForm'])
         ->name('login');
 
-    // Login POST - Soumettre le formulaire
-    Route::post('/connexion', [AuthController::class, 'login'])
+    // Login POST - Submit Form
+    Route::post('/login', [AuthController::class, 'login'])
         ->name('login.submit');
 
     // ============================================================
-    // ROUTES PROTÉGÉES (Authentifiées admin)
+    // PROTECTED ROUTES (Authenticated Admin)
     // ============================================================
 
     Route::middleware(['auth:admin'])->group(function () {
@@ -379,88 +415,142 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])
             ->name('dashboard');
 
-        // --- DÉCONNEXION ---
-        Route::post('/deconnexion', [AuthController::class, 'logout'])
+        // --- LOGOUT ---
+        Route::post('/logout', [AuthController::class, 'logout'])
             ->name('logout');
 
-        // --- GESTION DES UTILISATEURS ---
-        Route::prefix('utilisateurs')->name('users.')->group(function () {
+        // --- USER MANAGEMENT ---
+        Route::prefix('users')->name('users.')->group(function () {
             Route::get('/', [UserController::class, 'index'])->name('index');
+            Route::get('/export', [UserController::class, 'export'])->name('export');
             Route::get('/{id}', [UserController::class, 'show'])->name('show');
             Route::put('/{id}', [UserController::class, 'update'])->name('update');
-            Route::post('/{id}/activer', [UserController::class, 'activate'])->name('activate');
-            Route::post('/{id}/desactiver', [UserController::class, 'deactivate'])->name('deactivate');
+            Route::post('/{id}/activate', [UserController::class, 'activate'])->name('activate');
+            Route::post('/{id}/deactivate', [UserController::class, 'deactivate'])->name('deactivate');
+            Route::delete('/{id}', [UserController::class, 'destroy'])->name('destroy');
         });
 
-        // --- GESTION DES TRANSACTIONS ---
+        // --- TRANSACTIONS MANAGEMENT ---
         Route::prefix('transactions')->name('transactions.')->group(function () {
             Route::get('/', [TransactionController::class, 'index'])->name('index');
-            Route::post('/{id}/valider', [TransactionController::class, 'validateTransaction'])
-                ->name('validate');
+            Route::get('/export', [TransactionController::class, 'export'])->name('export');
+            Route::get('/{id}', [TransactionController::class, 'show'])->name('show');
+            Route::post('/{id}/validate', [TransactionController::class, 'validateTransaction'])->name('validate');
+            Route::post('/{id}/reject', [TransactionController::class, 'rejectTransaction'])->name('reject');
+            Route::post('/{id}/cancel', [TransactionController::class, 'cancelTransaction'])->name('cancel');
         });
 
-        // --- VALIDATION DES DEMANDES DE FINANCEMENT ---
+        // --- FUNDING REQUEST VALIDATION ---
         Route::prefix('funding')->name('funding.')->group(function () {
-            Route::get('/validation-prix', [FundingValidationController::class, 'pendingValidation'])
+
+            // === LISTES ET VUES ===
+            Route::get('/pending-validation', [FundingValidationController::class, 'pendingValidation'])
                 ->name('pending-validation');
-            Route::post('/{id}/definir-prix', [FundingValidationController::class, 'setPrice'])
-                ->name('set-price');
-            Route::get('/verifications-paiements', [FundingValidationController::class, 'pendingPayments'])
+
+            // NOUVELLE ROUTE: Liste des transferts en attente de validation finale
+            Route::get('/pending-transfers', [FundingValidationController::class, 'pendingTransfers'])
+                ->name('pending-transfers');
+
+            Route::get('/pending-payments', [FundingValidationController::class, 'pendingPayments'])
                 ->name('pending-payments');
-            Route::post('/paiements/{paymentId}/verifier', [FundingValidationController::class, 'verifyPayment'])
+
+            Route::get('/{id}', [FundingValidationController::class, 'showRequest'])
+                ->name('show-request');
+
+            // === ACTIONS SUR DEMANDES PERSONNALISÉES ===
+            Route::post('/{id}/set-price', [FundingValidationController::class, 'setPrice'])
+                ->name('set-price');
+
+            Route::post('/{id}/under-review', [FundingValidationController::class, 'setUnderReview'])
+                ->name('under-review');
+
+            Route::post('/{id}/reject', [FundingValidationController::class, 'rejectRequest'])
+                ->name('reject-request');
+
+            // === ACTIONS SUR DEMANDES PRÉDÉFINIES ===
+            Route::post('/{id}/approve-predefined', [FundingValidationController::class, 'approvePredefined'])
+                ->name('approve-predefined');
+
+            // Vérification des documents (valide ou crée documents manquants)
+            Route::post('/{id}/check-documents', [FundingValidationController::class, 'checkDocuments'])
+                ->name('check-documents');
+
+            // NOUVELLE ROUTE: Vérifier documents manquants et programmer transfert
+            Route::post('/{id}/verify-and-schedule', [FundingValidationController::class, 'verifyMissingDocumentsAndScheduleTransfer'])
+                ->name('verify-and-schedule');
+
+            // === GESTION DU TRANSFERT DIFFÉRÉ ===
+            // NOUVELLE ROUTE: Exécuter le transfert final (créditer le wallet)
+            Route::post('/{id}/execute-transfer', [FundingValidationController::class, 'executeTransfer'])
+                ->name('execute-transfer');
+
+            // NOUVELLE ROUTE: Annuler un transfert programmé (optionnel)
+            Route::post('/{id}/cancel-transfer', [FundingValidationController::class, 'cancelTransfer'])
+                ->name('cancel-transfer');
+
+            // === FINALISATION ===
+            Route::post('/{id}/complete', [FundingValidationController::class, 'completeRequest'])
+                ->name('complete');
+
+            // === VALIDATION DES PAIEMENTS ===
+            Route::post('/payments/{paymentId}/verify', [FundingValidationController::class, 'verifyPayment'])
                 ->name('verify-payment');
         });
 
-        // --- GESTION DES DOCUMENTS ---
+        // --- DOCUMENT MANAGEMENT ---
         Route::prefix('documents')->name('documents.')->group(function () {
             Route::get('/', [AdminDocumentController::class, 'index'])->name('index');
-            Route::post('/{id}/valider', [AdminDocumentController::class, 'validateDocument'])
-                ->name('validate');
+            Route::post('/bulk-validate', [AdminDocumentController::class, 'bulkValidate'])->name('bulk-validate');
+            Route::post('/user/{userId}/validate-all', [AdminDocumentController::class, 'validateUserDocuments'])->name('validate-user');
+
+            Route::get('/user/{userId}', [AdminDocumentController::class, 'show'])->name('show');
+            Route::get('/{id}/download', [AdminDocumentController::class, 'download'])->name('download');
+            Route::post('/{id}/validate', [AdminDocumentController::class, 'validateDocument'])->name('validate');
+            Route::post('/{id}/reject', [AdminDocumentController::class, 'reject'])->name('reject');
+            Route::post('/{id}/pending', [AdminDocumentController::class, 'pending'])->name('pending');
         });
 
-        // --- GESTION DES FORMATIONS ---
-        Route::prefix('formations')->name('trainings.')->group(function () {
+        // --- TRAINING MANAGEMENT ---
+        Route::prefix('training')->name('trainings.')->group(function () {
             Route::get('/', [AdminTrainingController::class, 'index'])->name('index');
-            Route::get('/creer', [AdminTrainingController::class, 'create'])->name('create');
+            Route::get('/create', [AdminTrainingController::class, 'create'])->name('create');
             Route::post('/', [AdminTrainingController::class, 'store'])->name('store');
         });
 
-        // --- SUPPORT ADMIN ---
+        // --- ADMIN SUPPORT ---
         Route::prefix('support')->name('support.')->group(function () {
             Route::get('/', [AdminSupportController::class, 'index'])->name('index');
             Route::get('/{id}', [AdminSupportController::class, 'show'])->name('show');
-            Route::post('/{id}/repondre', [AdminSupportController::class, 'reply'])->name('reply');
+            Route::post('/{id}/reply', [AdminSupportController::class, 'reply'])->name('reply');
         });
 
-        // --- RAPPORTS ---
-        Route::prefix('rapports')->name('reports.')->group(function () {
+        // --- REPORTS ---
+        Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/', [ReportController::class, 'index'])->name('index');
-            Route::get('/generer', [ReportController::class, 'generate'])->name('generate');
+            Route::get('/generate', [ReportController::class, 'generate'])->name('generate');
         });
 
-        // --- PARAMÈTRES SYSTÈME ---
-        Route::prefix('parametres')->name('settings.')->group(function () {
+        // --- SYSTEM SETTINGS ---
+        Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/', [SettingController::class, 'index'])->name('index');
             Route::put('/', [SettingController::class, 'update'])->name('update');
         });
-
-    }); // Fin middleware auth:admin
-
-}); // Fin prefix admin
+    });
+});
 
 /*
 |--------------------------------------------------------------------------
-| Routes API
+| API Routes (routes/api.php alternative)
 |--------------------------------------------------------------------------
 */
 
 Route::prefix('api')->name('api.')->group(function () {
-    // API Publique
-    Route::get('/statistiques', [StatController::class, 'index'])->name('stats');
+    // Public API
+    Route::get('/statistics', [StatController::class, 'index'])->name('stats');
     Route::post('/contact', [ContactController::class, 'store'])->name('contact');
-    Route::get('/programmes', [ProgramController::class, 'index'])->name('programs');
+    Route::get('/programs', [ProgramController::class, 'index'])->name('programs');
 
-    // API Authentifiée
+    // Authenticated API
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/user', function (Request $request) {
             return $request->user();
@@ -474,7 +564,7 @@ Route::prefix('api')->name('api.')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Routes PWA
+| PWA Routes
 |--------------------------------------------------------------------------
 */
 
@@ -485,15 +575,15 @@ Route::get('/offline', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Routes de pages statiques
+| Static Pages Routes
 |--------------------------------------------------------------------------
 */
 
-Route::get('/confidentialite', function () {
+Route::get('/privacy', function () {
     return view('static.privacy');
 })->name('privacy');
 
-Route::get('/conditions-utilisation', function () {
+Route::get('/terms', function () {
     return view('static.terms');
 })->name('terms');
 
@@ -501,31 +591,31 @@ Route::get('/faq', function () {
     return view('static.faq');
 })->name('faq');
 
-Route::get('/actualites', function () {
+Route::get('/news', function () {
     return view('static.news');
 })->name('news');
 
-Route::get('/actualites/{slug}', function ($slug) {
+Route::get('/news/{slug}', function ($slug) {
     return view('static.news-detail', compact('slug'));
 })->name('news.detail');
 
-Route::get('/temoignages', function () {
+Route::get('/testimonials', function () {
     return view('static.testimonials');
 })->name('testimonials');
 
-Route::get('/partenaires', function () {
+Route::get('/partners', function () {
     return view('static.partners');
 })->name('partners');
 
-Route::get('/mentions-legales', function () {
+Route::get('/legal', function () {
     return view('static.legal');
 })->name('legal');
 
-Route::get('/accessibilite', function () {
+Route::get('/accessibility', function () {
     return view('static.accessibility');
 })->name('accessibility');
 
-Route::get('/plan-du-site', function () {
+Route::get('/sitemap', function () {
     return view('static.sitemap');
 })->name('sitemap');
 
@@ -535,24 +625,13 @@ Route::get('/cgu', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Routes de compatibilité et redirections
+| Compatibility and Redirect Routes
 |--------------------------------------------------------------------------
 */
 
-Route::redirect('/register', '/inscription', 301);
-Route::redirect('/login', '/connexion', 301);
-Route::redirect('/signup', '/inscription', 301);
-Route::redirect('/signin', '/connexion', 301);
-Route::redirect('/about', '/a-propos', 301);
-Route::redirect('/services', '/nos-services', 301);
-Route::redirect('/contact-us', '/contact', 301);
-Route::redirect('/get-started', '/inscription', 301);
-Route::redirect('/sign-out', '/deconnexion', 301);
-Route::redirect('/account', '/client/profile', 301);
-
 /*
 |--------------------------------------------------------------------------
-| Routes de test et développement
+| Test and Development Routes
 |--------------------------------------------------------------------------
 */
 
@@ -572,7 +651,7 @@ if (app()->environment('local')) {
 
 /*
 |--------------------------------------------------------------------------
-| Routes de maintenance
+| Maintenance Routes
 |--------------------------------------------------------------------------
 */
 
@@ -585,7 +664,7 @@ Route::get('/maintenance', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Route fallback pour les pages 404
+| Fallback Route for 404 Pages
 |--------------------------------------------------------------------------
 */
 

@@ -45,6 +45,8 @@ class Notification extends Model
             'funding_received' => 'fas fa-money-bill-wave',
             'repayment_due' => 'fas fa-calendar-alt',
             'support_ticket_created' => 'fas fa-headset',
+            'support_ticket_reply' => 'fas fa-reply',           // Nouveau
+            'support_ticket_closed' => 'fas fa-lock',           // Nouveau
             'document_validated' => 'fas fa-file-check',
             'document_rejected' => 'fas fa-file-exclamation'
         ];
@@ -65,6 +67,8 @@ class Notification extends Model
             'funding_received' => 'success',
             'repayment_due' => 'warning',
             'support_ticket_created' => 'info',
+            'support_ticket_reply' => 'success',                // Nouveau
+            'support_ticket_closed' => 'secondary',             // Nouveau
             'document_validated' => 'success',
             'document_rejected' => 'danger'
         ];

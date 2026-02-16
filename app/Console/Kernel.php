@@ -12,7 +12,11 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Traiter les remboursements automatiques tous les jours à 6h du matin
+        $schedule->command('repayments:process')->dailyAt('06:00');
+
+        // Envoyer les rappels 3 jours avant l'échéance
+        $schedule->command('repayments:remind')->dailyAt('09:00');
     }
 
     /**
@@ -20,7 +24,7 @@ class Kernel extends ConsoleKernel
      */
     protected function commands(): void
     {
-        $this->load(__DIR__.'/Commands');
+        $this->load(__DIR__ . '/Commands');
 
         require base_path('routes/console.php');
     }

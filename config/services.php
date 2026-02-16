@@ -30,11 +30,11 @@ return [
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
-
-    'lygos' => [
-        'api_key' => env('LYGOS_API_KEY'),
-        'api_url' => env('LYGOS_API_URL', 'https://api.lygosapp.com'),
-        'webhook_secret' => env('LYGOS_WEBHOOK_SECRET'),
+    'kkiapay' => [
+        'public_key' => env('KKIAPAY_PUBLIC_KEY'),
+        'private_key' => env('KKIAPAY_PRIVATE_KEY'),
+        'secret' => env('KKIAPAY_SECRET'),
+        'sandbox' => env('KKIAPAY_SANDBOX', true),
     ],
 
 ];

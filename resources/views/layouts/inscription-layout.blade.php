@@ -57,7 +57,7 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { font-size: 16px; scroll-behavior: smooth; }
+        html { font-size: 16px; scroll-behavior: smooth; height: 100%; }
 
         body {
             font-family: var(--bh-font-body);
@@ -65,11 +65,13 @@
             min-height: 100vh;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            display: flex;
+            flex-direction: column;
         }
 
         /* ============================================
            MODE INSCRIPTION (Step Wizard)
-        ============================================ */
+           ============================================ */
         body.mode-inscription {
             background: linear-gradient(135deg, #f8fafc 0%, #e9ecef 100%);
             color: var(--bh-gray-dark);
@@ -77,18 +79,20 @@
 
         /* ============================================
            MODE CONNEXION (Split Screen)
-        ============================================ */
+           ============================================ */
         body.mode-connexion {
             background: linear-gradient(135deg, #0a1f44 0%, #1b5a8d 100%);
+            min-height: 100vh;
+            padding: 20px;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
         }
 
         /* ============================================
            HEADER COMMUN
-        ============================================ */
+           ============================================ */
         .auth-header {
             background: white;
             padding: 1rem 2rem;
@@ -96,16 +100,34 @@
             position: sticky;
             top: 0;
             z-index: 1030;
+            width: 100%;
         }
 
         body.mode-connexion .auth-header {
-            position: absolute;
+            position: fixed;
             top: 20px;
             left: 20px;
             right: 20px;
-            background: rgba(255, 255, 255, 0.92);
+            width: auto;
+            max-width: calc(1200px - 40px);
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 16px;
             padding: 0.75rem 1.25rem;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 1040;
+        }
+
+        /* HEADER CACHÉ SUR MOBILE/TABLETTE EN MODE CONNEXION */
+        @media (max-width: 992px) {
+            body.mode-connexion .auth-header {
+                display: none;
+            }
+            
+            body.mode-connexion {
+                padding: 0;
+            }
         }
 
         .auth-header-container {
@@ -129,7 +151,16 @@
 
         body.mode-connexion .brand-section { color: var(--bh-primary-dark); }
 
-        .brand-logo {
+        /* LOGO IMAGE DANS LE HEADER */
+        .brand-logo-img {
+            height: 45px;
+            width: auto;
+            max-width: 150px;
+            object-fit: contain;
+        }
+
+        /* Fallback si image ne charge pas */
+        .brand-logo-fallback {
             width: 50px;
             height: 50px;
             background: linear-gradient(135deg, var(--bh-primary) 0%, var(--bh-primary-light) 100%);
@@ -184,8 +215,33 @@
         }
 
         /* ============================================
+           CONTENU PRINCIPAL
+           ============================================ */
+        .main-content {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.mode-connexion .main-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-top: 100px; /* Espace pour le header fixe sur desktop */
+            min-height: 100vh;
+        }
+
+        /* Sur mobile/tablette, pas de padding pour le header caché */
+        @media (max-width: 992px) {
+            body.mode-connexion .main-content {
+                padding-top: 0;
+            }
+        }
+
+        /* ============================================
            CONTAINER INSCRIPTION (Step Wizard)
-        ============================================ */
+           ============================================ */
         .inscription-wrapper {
             flex: 1;
             padding: 2rem 1rem;
@@ -345,64 +401,53 @@
 
         /* ============================================
            CONTAINER CONNEXION (Split Screen)
-        ============================================ */
-        .login-container {
+           ============================================ */
+        .auth-box {
             width: 100%;
             max-width: 1200px;
             display: flex;
-            min-height: 700px;
+            min-height: 600px;
+            max-height: 90vh;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             border-radius: 20px;
             overflow: hidden;
             background: white;
+            margin: 0 auto;
         }
 
-        .login-left {
-            flex: 1;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 50px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            color: white;
-            position: relative;
-        }
-
-        body.mode-connexion .auth-header + .login-container { margin-top: 80px; }
-
-        .login-right {
+        .auth-box-left {
             flex: 1;
             background: white;
-            padding: 50px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .feature-list {
-            list-style: none;
-            padding: 0;
-            margin: 40px 0;
-        }
-        .feature-list li {
-            margin-bottom: 20px;
+            padding: 3rem;
             display: flex;
             align-items: center;
-            gap: 15px;
-            font-size: 1.1rem;
+            justify-content: center;
+            color: var(--bh-gray-dark);
         }
-        .feature-list i { color: var(--bh-accent); font-size: 1.5rem; }
+
+        .auth-box-right {
+            flex: 1;
+            background: white;
+            padding: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
         /* ============================================
            FOOTER
-        ============================================ */
+           ============================================ */
         .auth-footer {
             background: var(--bh-primary-dark);
             color: white;
             padding: 2rem;
             text-align: center;
             margin-top: auto;
+            width: 100%;
+        }
+
+        body.mode-connexion .auth-footer {
+            display: none;
         }
 
         .footer-links {
@@ -428,7 +473,7 @@
 
         /* ============================================
            ANIMATIONS
-        ============================================ */
+           ============================================ */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -443,28 +488,93 @@
         }
 
         /* ============================================
-           RESPONSIVE
-        ============================================ */
+           RESPONSIVE GLOBAL
+           ============================================ */
+        @media (max-width: 1200px) {
+            body.mode-connexion .auth-header {
+                left: 20px;
+                right: 20px;
+                max-width: none;
+            }
+        }
+
         @media (max-width: 992px) {
-            .login-container { flex-direction: column; max-width: 500px; }
-            .login-left { display: none; }
-            .login-right { padding: 30px 20px; }
-            body.mode-connexion { padding: 10px; }
-            body.mode-connexion .auth-header { position: relative; top: 0; left: 0; right: 0; margin-bottom: 20px; }
+            .auth-box {
+                flex-direction: column;
+                max-width: 500px;
+                max-height: none;
+            }
+            
+            .auth-box-left {
+                display: none;
+            }
+            
+            .auth-box-right {
+                padding: 2rem;
+            }
+            
+            body.mode-connexion {
+                padding: 0;
+                background: white;
+            }
+            
+            body.mode-connexion .auth-header {
+                position: relative;
+                top: 0;
+                left: 0;
+                right: 0;
+                margin-bottom: 20px;
+                max-width: 500px;
+            }
+            
+            body.mode-connexion .main-content {
+                padding-top: 0;
+            }
         }
 
         @media (max-width: 768px) {
             .auth-header { padding: 1rem; }
+            .brand-logo-img { height: 40px; }
             .brand-text h1 { font-size: 1.25rem; }
             .brand-text p { display: none; }
+            
             .inscription-card-header { padding: 1.5rem; }
             .inscription-card-header h2 { font-size: 1.5rem; }
             .inscription-card-body { padding: 1.5rem; }
+            
             .step-indicators { gap: 0.5rem; }
             .step-label { font-size: 0.75rem; }
             .step-number { width: 35px; height: 35px; font-size: 0.9rem; }
             .step-navigation { flex-direction: column-reverse; }
             .btn-step { width: 100%; justify-content: center; }
+            
+            .auth-box-right {
+                padding: 1.5rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            body.mode-connexion {
+                padding: 0;
+                background: white;
+            }
+            
+            body.mode-connexion .auth-header {
+                border-radius: 0;
+                margin-bottom: 0;
+                padding: 0.75rem 1rem;
+            }
+            
+            .auth-box {
+                border-radius: 0;
+                box-shadow: none;
+                min-height: calc(100vh - 70px);
+            }
+            
+            .auth-box-right {
+                padding: 1.5rem 1rem;
+                align-items: flex-start;
+            }
         }
 
         /* Utilitaires spécifiques au contenu */
@@ -479,10 +589,19 @@
     <header class="auth-header">
         <div class="auth-header-container">
             <a href="{{ url('/') }}" class="brand-section">
-                <div class="brand-logo">
+                <!-- Logo Image avec fallback -->
+                <img src="{{ asset('images/logo.png') }}" 
+                     alt="BHDM Logo" 
+                     class="brand-logo-img"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                
+                <!-- Fallback icône si image indisponible -->
+                <div class="brand-logo-fallback" style="display: none;">
                     <i class="fas fa-hand-holding-heart"></i>
                 </div>
-                <div class="brand-text">
+                
+                <!-- Texte caché sur mobile -->
+                <div class="brand-text d-none d-md-block">
                     <h1>BHDM</h1>
                     <p>Banque Humanitaire du Développement Mondial</p>
                 </div>
@@ -494,7 +613,7 @@
                 @else
                     <a href="{{ route('login') }}" class="btn-auth-nav">
                         <i class="fas fa-sign-in-alt"></i>
-                        <span>Connexion</span>
+                        <span class="d-none d-sm-inline">Connexion</span>
                     </a>
                 @endif
             </div>
@@ -502,7 +621,9 @@
     </header>
 
     <!-- Contenu principal -->
-    @yield('content_wrapper')
+    <main class="main-content">
+        @yield('content_wrapper')
+    </main>
 
     <!-- Footer (uniquement en mode inscription) -->
     @section('footer')

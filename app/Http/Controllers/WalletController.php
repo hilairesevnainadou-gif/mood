@@ -4,25 +4,28 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Wallet;
-use App\Models\Funding;
 use App\Models\Transaction;
+use Illuminate\Support\Str;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use App\Models\FundingRequest;
-use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class WalletController extends Controller
 {
+    /**
+     * Affiche la page du portefeuille
+     */
     public function wallet()
     {
         $user = Auth::user();
         $wallet = Wallet::where('user_id', $user->id)->first();
-        
+
+        // Créer le wallet s'il n'existe pas
         if (!$wallet) {
             $walletNumber = $this->generateWalletNumber();
             $defaultPin = '000000';
@@ -36,47 +39,46 @@ class WalletController extends Controller
             ]);
         }
 
+        // Récupérer les transactions récentes
         $transactions = $wallet->transactions()->latest()->paginate(10);
-        
-        // Récupérer les financements en attente
+
+        // Récupérer les financements en attente de crédit
         $pendingFundings = FundingRequest::where('user_id', $user->id)
-            ->whereIn('status', ['approved', 'funded'])
-            ->where(function($query) {
-                $query->whereNull('credited_at')
-                      ->orWhere('credited_at', '>', now()->subHours(24));
-            })
-            ->with(['committeeDecision' => function($query) {
-                $query->latest();
-            }])
+            ->whereIn('status', ['completed', 'transfer_pending', 'documents_validated'])
+            ->whereNull('credited_at')
+            ->with(['fundingType', 'documents'])
             ->latest()
             ->get();
 
         // Statistiques mensuelles
         $monthlyStats = [
             'deposits' => $wallet->transactions()
-                ->where('type', 'deposit')
+                ->where('type', 'credit')
+                ->where('status', 'completed')
                 ->whereMonth('created_at', now()->month)
                 ->sum('amount'),
-            
+
             'withdrawals' => $wallet->transactions()
-                ->where('type', 'withdrawal')
+                ->where('type', 'debit')
+                ->where('status', 'completed')
                 ->whereMonth('created_at', now()->month)
                 ->sum('amount'),
-            
-            'fundings' => $wallet->transactions()
-                ->where('type', 'funding')
+
+            'payments' => $wallet->transactions()
+                ->where('type', 'payment')
+                ->where('status', 'completed')
                 ->whereMonth('created_at', now()->month)
                 ->sum('amount'),
-            
+
             'transfers' => $wallet->transactions()
                 ->where('type', 'transfer')
+                ->where('status', 'completed')
                 ->whereMonth('created_at', now()->month)
                 ->sum('amount'),
         ];
 
-        // Calculer le total des entrées et sorties
-        $monthlyStats['total_in'] = $monthlyStats['deposits'] + $monthlyStats['fundings'];
-        $monthlyStats['total_out'] = $monthlyStats['withdrawals'] + $monthlyStats['transfers'];
+        $monthlyStats['total_in'] = $monthlyStats['deposits'];
+        $monthlyStats['total_out'] = $monthlyStats['withdrawals'] + $monthlyStats['payments'] + $monthlyStats['transfers'];
         $monthlyStats['balance_change'] = $monthlyStats['total_in'] - $monthlyStats['total_out'];
 
         return view('client.wallet.index', compact(
@@ -87,18 +89,57 @@ class WalletController extends Controller
         ));
     }
 
+    /**
+     * Liste des transactions
+     */
+    public function transactions(Request $request)
+    {
+        $user = Auth::user();
+        $wallet = Wallet::where('user_id', $user->id)->firstOrFail();
+
+        $query = $wallet->transactions()->latest();
+
+        // Filtres
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $transactions = $query->paginate(20)->withQueryString();
+
+        $stats = [
+            'total_in' => (clone $query)->whereIn('type', ['credit', 'refund'])->sum('amount'),
+            'total_out' => (clone $query)->whereIn('type', ['debit', 'payment', 'fee'])->sum('amount'),
+            'count' => (clone $query)->count(),
+        ];
+
+        return view('client.wallet.transactions', compact('transactions', 'stats'));
+    }
+
+    /**
+     * Dépôt via Kkiapay - Initialisation côté serveur
+     */
     public function deposit(Request $request)
     {
         $validated = $request->validate([
-            'amount' => 'required|numeric|min:1000',
-            'payment_method' => 'required|in:mobile_money,bank_transfer,card',
-            'phone_number' => 'required_if:payment_method,mobile_money|string|max:20',
-            'mobile_operator' => 'required_if:payment_method,mobile_money|in:orange,mtn,moov,wave',
+            'amount' => 'required|numeric|min:100',
+            'phone' => 'required|string|min:8',
         ]);
 
         $user = Auth::user();
         $wallet = Wallet::where('user_id', $user->id)->first();
-        
+
         if (!$wallet) {
             return response()->json([
                 'success' => false,
@@ -110,295 +151,309 @@ class WalletController extends Controller
             // Créer une transaction en attente
             $transaction = Transaction::create([
                 'wallet_id' => $wallet->id,
-                'type' => 'deposit',
+                'transaction_id' => (string) Str::uuid(),
+                'type' => 'credit',
                 'amount' => $validated['amount'],
+                'total_amount' => $validated['amount'],
                 'status' => 'pending',
-                'payment_method' => $validated['payment_method'],
-                'description' => 'Dépôt via ' . $validated['payment_method'],
-                'reference' => 'DEP' . time() . rand(1000, 9999),
+                'payment_method' => 'kkiapay',
+                'description' => 'Dépôt via Kkiapay',
+                'reference' => 'DEP-' . strtoupper(Str::random(10)),
                 'metadata' => [
-                    'phone_number' => $validated['phone_number'] ?? null,
-                    'mobile_operator' => $validated['mobile_operator'] ?? null,
-                    'action' => 'deposit',
+                    'phone' => $validated['phone'],
+                    'initiated_at' => now()->toIso8601String(),
                 ],
             ]);
 
-            // Initier le paiement via Lygos
-            $lygosResponse = $this->initiateLygosPayment([
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaction initiée',
+                'transaction_id' => $transaction->transaction_id,
                 'amount' => $validated['amount'],
-                'payment_method' => $validated['payment_method'],
-                'phone_number' => $validated['phone_number'] ?? null,
-                'mobile_operator' => $validated['mobile_operator'] ?? null,
-                'transaction_id' => $transaction->id,
-                'user_id' => $user->id,
-                'wallet_id' => $wallet->id,
             ]);
-
-            if ($lygosResponse['success'] && isset($lygosResponse['payment_url'])) {
-                // Sauvegarder l'ID de transaction Lygos
-                $transaction->update([
-                    'provider_transaction_id' => $lygosResponse['transaction_id'] ?? null,
-                    'metadata' => array_merge($transaction->metadata ?? [], [
-                        'lygos_transaction_id' => $lygosResponse['transaction_id'] ?? null,
-                        'payment_url' => $lygosResponse['payment_url'],
-                    ]),
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Paiement initié avec succès',
-                    'payment_url' => $lygosResponse['payment_url'],
-                    'transaction_id' => $transaction->id,
-                ]);
-
-            } else {
-                $transaction->update(['status' => 'failed']);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur Lygos: ' . ($lygosResponse['message'] ?? 'Échec de l\'initialisation du paiement')
-                ], 500);
-            }
-
         } catch (\Exception $e) {
-            Log::error('Erreur dépôt: ' . $e->getMessage());
+            Log::error('Erreur init dépôt: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
+                'message' => 'Erreur lors de l\'initialisation: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    public function depositCallback(Request $request)
+    /**
+     * Demande de retrait avec vérification du PIN (pas du mot de passe)
+     */
+    public function withdraw(Request $request)
     {
-        // Vérifier la signature de la callback (important pour la sécurité)
-        if (!$this->verifyLygosCallback($request)) {
-            Log::warning('Signature Lygos invalide', $request->all());
-            return response()->json(['error' => 'Signature invalide'], 400);
-        }
-
-        $transactionId = $request->input('transaction_id');
-        $status = $request->input('status');
-        $amount = $request->input('amount');
-
-        Log::info('Callback Lygos dépôt', [
-            'transaction_id' => $transactionId,
-            'status' => $status,
-            'amount' => $amount,
-        ]);
-
-        $transaction = Transaction::where('provider_transaction_id', $transactionId)
-            ->orWhere('metadata->lygos_transaction_id', $transactionId)
-            ->first();
-        
-        if (!$transaction) {
-            Log::warning('Transaction non trouvée pour callback', ['transaction_id' => $transactionId]);
-            return response()->json(['error' => 'Transaction non trouvée'], 404);
-        }
-
-        if ($status === 'success' || $status === 'completed') {
-            // Mettre à jour le statut de la transaction
-            $transaction->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-                'amount' => $amount ?? $transaction->amount,
+        try {
+            $validated = $request->validate([
+                'amount' => 'required|numeric|min:1000',
+                'withdraw_method' => 'required|in:mobile_money,bank_transfer',
+                'phone_number' => 'nullable|string|max:20',
+                'account_name' => 'nullable|string|max:255',
+                'account_number' => 'nullable|string|max:50',
+                'bank_name' => 'nullable|string|max:255',
+                'pin' => 'required|string|size:6',
+                'note' => 'nullable|string|max:500',
             ]);
 
-            // Créditer le wallet
-            $wallet = $transaction->wallet;
-            $wallet->increment('balance', $transaction->amount);
+            // Validation conditionnelle selon la méthode
+            if ($validated['withdraw_method'] === 'mobile_money' && empty($validated['phone_number'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le numéro de téléphone est requis pour Mobile Money'
+                ], 422);
+            }
+
+            if ($validated['withdraw_method'] === 'bank_transfer') {
+                $missingFields = [];
+                if (empty($validated['account_name'])) $missingFields[] = 'nom du bénéficiaire';
+                if (empty($validated['account_number'])) $missingFields[] = 'numéro de compte';
+                if (empty($validated['bank_name'])) $missingFields[] = 'nom de la banque';
+
+                if (!empty($missingFields)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Champs requis manquants : ' . implode(', ', $missingFields)
+                    ], 422);
+                }
+            }
+
+            $user = Auth::user();
+
+            // Récupérer le wallet avec verrouillage pessimiste
+            $wallet = Wallet::where('user_id', $user->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Portefeuille non trouvé'
+                ], 404);
+            }
+
+            // Vérifier le PIN du wallet
+            if (!$wallet->pin_hash || !Hash::check($validated['pin'], $wallet->pin_hash)) {
+                Log::warning('Tentative de retrait avec PIN invalide', [
+                    'user_id' => $user->id,
+                    'wallet_id' => $wallet->id,
+                    'ip' => $request->ip()
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PIN incorrect'
+                ], 403);
+            }
+
+            // Vérifier le solde
+            $currentBalance = (float) $wallet->balance;
+            $requestedAmount = (float) $validated['amount'];
+
+            if ($currentBalance < $requestedAmount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Solde insuffisant. Disponible : ' . number_format($currentBalance, 0, ',', ' ') . ' FCFA'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // Décrémenter immédiatement le solde
+            $wallet->balance = $currentBalance - $requestedAmount;
+            $wallet->last_transaction_at = now();
+            $wallet->save();
+
+            // Préparer les métadonnées
+            $metadata = [
+                'requested_at' => now()->toIso8601String(),
+                'requested_by' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+                'note' => $validated['note'] ?? null,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ];
+
+            if ($validated['withdraw_method'] === 'mobile_money') {
+                $metadata['phone_number'] = $validated['phone_number'];
+            } else {
+                $metadata['account_name'] = $validated['account_name'];
+                $metadata['account_number'] = $validated['account_number'];
+                $metadata['bank_name'] = $validated['bank_name'];
+            }
+
+            // CORRECTION ICI : Utiliser 'debit' au lieu de 'withdrawal'
+            // Vérifiez les valeurs autorisées dans votre table transactions (type ENUM)
+            $transaction = Transaction::create([
+                'wallet_id' => $wallet->id,
+                'user_id' => $user->id,
+                'transaction_id' => (string) Str::uuid(),
+                'type' => 'debit', // CHANGÉ : 'withdrawal' -> 'debit' (ou autre valeur valide)
+                'amount' => $requestedAmount,
+                'total_amount' => $requestedAmount,
+                'fee' => 0,
+                'status' => 'pending',
+                'payment_method' => $validated['withdraw_method'],
+                'description' => 'Demande de retrait - En attente de validation',
+                'reference' => 'WIT-' . strtoupper(Str::random(10)),
+                'metadata' => $metadata, // Laravel gère automatiquement le JSON
+            ]);
+
+            // Notification utilisateur
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'transaction',
+                'title' => 'Demande de retrait soumise',
+                'message' => 'Votre demande de ' . number_format($requestedAmount, 0, ',', ' ') . ' FCFA est en attente de validation.',
+                'data' => [
+                    'transaction_id' => $transaction->id,
+                    'reference' => $transaction->reference,
+                    'status' => 'pending',
+                    'amount' => $requestedAmount,
+                    'method' => $validated['withdraw_method']
+                ],
+            ]);
+
+            // Notification admin
+            $this->notifyAdmin($transaction, $user);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Demande soumise avec succès',
+                'transaction_id' => $transaction->id,
+                'reference' => $transaction->reference,
+                'status' => 'pending',
+                'new_balance' => $wallet->balance,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Validation erreur retrait:', $e->errors());
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Erreur retrait: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors du traitement. Veuillez réessayer.'
+            ], 500);
+        }
+    }
+
+
+    /**
+     * Annuler une demande de retrait en attente
+     */
+    public function cancelWithdrawal(Request $request, $transactionId)
+    {
+        try {
+            $user = Auth::user();
+            $wallet = Wallet::where('user_id', $user->id)->first();
+
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Portefeuille non trouvé'
+                ], 404);
+            }
+
+            DB::beginTransaction();
+
+            $transaction = Transaction::where('id', $transactionId)
+                ->where('wallet_id', $wallet->id)
+                ->where('status', 'pending')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$transaction) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Transaction non trouvée ou déjà traitée'
+                ], 404);
+            }
+
+            // Rembourser le solde
+            $wallet->balance += $transaction->amount;
+            $wallet->save();
+
+            // Mettre à jour la transaction
+            $transaction->status = 'cancelled';
+            $transaction->description = 'Demande annulée par l\'utilisateur';
+            $transaction->save();
 
             // Notification
             Notification::create([
-                'user_id' => $wallet->user_id,
-                'type' => 'transaction',
-                'title' => 'Dépôt réussi',
-                'message' => 'Votre dépôt de ' . number_format($transaction->amount) . ' XOF a été crédité.',
-                'data' => ['transaction_id' => $transaction->id],
-            ]);
-
-            Log::info('Dépôt crédité avec succès', ['transaction_id' => $transaction->id]);
-
-        } elseif ($status === 'failed' || $status === 'cancelled') {
-            $transaction->update(['status' => 'failed']);
-            Log::info('Dépôt échoué', ['transaction_id' => $transaction->id]);
-        }
-
-        return response()->json(['success' => true]);
-    }
-
-    public function withdraw(Request $request)
-    {
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:1000',
-            'withdraw_method' => 'required|in:mobile_money,bank_transfer',
-            'phone_number' => 'required_if:withdraw_method,mobile_money|string|max:20',
-            'mobile_operator' => 'required_if:withdraw_method,mobile_money|in:orange,mtn,moov,wave',
-            'account_name' => 'required_if:withdraw_method,bank_transfer|string|max:255',
-            'account_number' => 'required_if:withdraw_method,bank_transfer|string|max:50',
-            'bank_name' => 'required_if:withdraw_method,bank_transfer|string|max:255',
-        ]);
-
-        $user = Auth::user();
-        $wallet = Wallet::where('user_id', $user->id)->first();
-        
-        if (!$wallet) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Portefeuille non trouvé.'
-            ], 404);
-        }
-
-        if ($wallet->balance < $validated['amount']) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Solde insuffisant !'
-            ], 400);
-        }
-
-        try {
-            // Débiter le wallet immédiatement
-            $wallet->decrement('balance', $validated['amount']);
-
-            // Créer une transaction en attente
-            $transaction = Transaction::create([
-                'wallet_id' => $wallet->id,
-                'type' => 'withdrawal',
-                'amount' => $validated['amount'],
-                'status' => 'processing',
-                'payment_method' => $validated['withdraw_method'],
-                'description' => 'Retrait via ' . $validated['withdraw_method'],
-                'reference' => 'WIT' . time() . rand(1000, 9999),
-                'metadata' => [
-                    'phone_number' => $validated['phone_number'] ?? null,
-                    'mobile_operator' => $validated['mobile_operator'] ?? null,
-                    'account_name' => $validated['account_name'] ?? null,
-                    'account_number' => $validated['account_number'] ?? null,
-                    'bank_name' => $validated['bank_name'] ?? null,
-                    'action' => 'withdrawal',
-                ],
-            ]);
-
-            // Initier le retrait via Lygos
-            $lygosResponse = $this->initiateLygosPayout([
-                'amount' => $validated['amount'],
-                'payout_method' => $validated['withdraw_method'],
-                'phone_number' => $validated['phone_number'] ?? null,
-                'mobile_operator' => $validated['mobile_operator'] ?? null,
-                'account_name' => $validated['account_name'] ?? null,
-                'account_number' => $validated['account_number'] ?? null,
-                'bank_name' => $validated['bank_name'] ?? null,
-                'transaction_id' => $transaction->id,
                 'user_id' => $user->id,
-                'wallet_id' => $wallet->id,
+                'type' => 'transaction',
+                'title' => 'Retrait annulé',
+                'message' => 'Votre demande de retrait a été annulée. Le montant a été recrédité.',
+                'data' => json_encode([
+                    'transaction_id' => $transaction->id,
+                    'reference' => $transaction->reference,
+                    'refund_amount' => $transaction->amount
+                ]),
             ]);
 
-            if ($lygosResponse['success']) {
-                // Sauvegarder l'ID de transaction Lygos
-                $transaction->update([
-                    'provider_transaction_id' => $lygosResponse['transaction_id'] ?? null,
-                    'metadata' => array_merge($transaction->metadata ?? [], [
-                        'lygos_transaction_id' => $lygosResponse['transaction_id'] ?? null,
-                        'lygos_response' => $lygosResponse,
-                    ]),
-                ]);
+            DB::commit();
 
-                Notification::create([
-                    'user_id' => $user->id,
-                    'type' => 'transaction',
-                    'title' => 'Retrait initié',
-                    'message' => 'Votre retrait de ' . number_format($validated['amount']) . ' XOF a été initié.',
-                    'data' => ['transaction_id' => $transaction->id],
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Retrait initié avec succès !',
-                    'transaction_id' => $transaction->id,
-                    'new_balance' => $wallet->fresh()->balance
-                ]);
-
-            } else {
-                // Rembourser le wallet en cas d'échec
-                $wallet->increment('balance', $validated['amount']);
-                $transaction->update(['status' => 'failed']);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur Lygos: ' . ($lygosResponse['message'] ?? 'Échec de l\'initialisation du retrait')
-                ], 500);
-            }
-
+            return response()->json([
+                'success' => true,
+                'message' => 'Demande annulée avec succès',
+                'refund_amount' => $transaction->amount,
+                'new_balance' => $wallet->balance
+            ]);
         } catch (\Exception $e) {
-            Log::error('Erreur retrait: ' . $e->getMessage());
+            DB::rollBack();
+            Log::error('Erreur annulation retrait: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
+                'message' => 'Erreur lors de l\'annulation'
             ], 500);
         }
     }
 
-    public function withdrawCallback(Request $request)
+    /**
+     * Notifier les administrateurs d'une nouvelle demande
+     */
+    private function notifyAdmin(Transaction $transaction, $user)
     {
-        // Vérifier la signature de la callback
-        if (!$this->verifyLygosCallback($request)) {
-            Log::warning('Signature Lygos invalide pour retrait', $request->all());
-            return response()->json(['error' => 'Signature invalide'], 400);
+        try {
+            // Récupérer les admins ou envoyer email
+            // Exemple avec notification base de données
+            $admins = \App\Models\User::where('role', 'admin')->get();
+
+            foreach ($admins as $admin) {
+                Notification::create([
+                    'user_id' => $admin->id,
+                    'type' => 'admin_alert',
+                    'title' => 'Nouvelle demande de retrait',
+                    'message' => $user->name . ' demande un retrait de ' . number_format($transaction->amount, 0, ',', ' ') . ' FCFA',
+                    'data' => json_encode([
+                        'transaction_id' => $transaction->id,
+                        'reference' => $transaction->reference,
+                        'user_id' => $user->id
+                    ]),
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Erreur notification admin: ' . $e->getMessage());
         }
-
-        $transactionId = $request->input('transaction_id');
-        $status = $request->input('status');
-
-        Log::info('Callback Lygos retrait', [
-            'transaction_id' => $transactionId,
-            'status' => $status,
-        ]);
-
-        $transaction = Transaction::where('provider_transaction_id', $transactionId)
-            ->orWhere('metadata->lygos_transaction_id', $transactionId)
-            ->first();
-        
-        if (!$transaction) {
-            Log::warning('Transaction retrait non trouvée', ['transaction_id' => $transactionId]);
-            return response()->json(['error' => 'Transaction non trouvée'], 404);
-        }
-
-        if ($status === 'completed' || $status === 'success') {
-            $transaction->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-            ]);
-
-            Notification::create([
-                'user_id' => $transaction->wallet->user_id,
-                'type' => 'transaction',
-                'title' => 'Retrait traité',
-                'message' => 'Votre retrait de ' . number_format($transaction->amount) . ' XOF a été traité.',
-                'data' => ['transaction_id' => $transaction->id],
-            ]);
-
-            Log::info('Retrait traité avec succès', ['transaction_id' => $transaction->id]);
-
-        } elseif ($status === 'failed' || $status === 'cancelled') {
-            $transaction->update(['status' => 'failed']);
-            
-            // Rembourser le wallet
-            $wallet = $transaction->wallet;
-            $wallet->increment('balance', $transaction->amount);
-
-            Notification::create([
-                'user_id' => $wallet->user_id,
-                'type' => 'transaction',
-                'title' => 'Retrait échoué',
-                'message' => 'Votre retrait a échoué. Le montant a été remboursé.',
-                'data' => ['transaction_id' => $transaction->id],
-            ]);
-
-            Log::info('Retrait échoué, montant remboursé', ['transaction_id' => $transaction->id]);
-        }
-
-        return response()->json(['success' => true]);
     }
 
+    /**
+     * Transfert vers un autre wallet
+     */
     public function transfer(Request $request)
     {
         $validated = $request->validate([
@@ -410,7 +465,7 @@ class WalletController extends Controller
 
         $user = Auth::user();
         $wallet = Wallet::where('user_id', $user->id)->first();
-        
+
         if (!$wallet) {
             return response()->json([
                 'success' => false,
@@ -425,9 +480,8 @@ class WalletController extends Controller
             ], 400);
         }
 
-        // Trouver le portefeuille du destinataire
         $recipientWallet = Wallet::where('wallet_number', $validated['recipient_wallet'])->first();
-        
+
         if (!$recipientWallet) {
             return response()->json([
                 'success' => false,
@@ -444,20 +498,23 @@ class WalletController extends Controller
 
         try {
             DB::transaction(function () use ($wallet, $recipientWallet, $validated, $user) {
-                // Débiter le wallet émetteur
+                // Débiter l'émetteur
                 $wallet->decrement('balance', $validated['amount']);
-                
-                // Créditer le wallet destinataire
+
+                // Créditer le destinataire
                 $recipientWallet->increment('balance', $validated['amount']);
-                
-                // Créer la transaction pour l'émetteur
+
+                // Transaction émetteur
                 $senderTransaction = Transaction::create([
                     'wallet_id' => $wallet->id,
-                    'type' => 'transfer',
+                    'transaction_id' => (string) Str::uuid(),
+                    'type' => 'debit',
                     'amount' => $validated['amount'],
+                    'total_amount' => $validated['amount'],
                     'status' => 'completed',
+                    'payment_method' => 'transfer',
                     'description' => 'Transfert vers ' . ($validated['recipient_name'] ?? $recipientWallet->wallet_number),
-                    'reference' => 'TRF' . time() . rand(1000, 9999),
+                    'reference' => 'TRF-' . strtoupper(Str::random(10)),
                     'metadata' => [
                         'recipient_wallet' => $recipientWallet->wallet_number,
                         'recipient_name' => $validated['recipient_name'],
@@ -465,13 +522,16 @@ class WalletController extends Controller
                         'direction' => 'out',
                     ],
                 ]);
-                
-                // Créer la transaction pour le destinataire
+
+                // Transaction destinataire
                 $receiverTransaction = Transaction::create([
                     'wallet_id' => $recipientWallet->id,
-                    'type' => 'transfer',
+                    'transaction_id' => (string) Str::uuid(),
+                    'type' => 'credit',
                     'amount' => $validated['amount'],
+                    'total_amount' => $validated['amount'],
                     'status' => 'completed',
+                    'payment_method' => 'transfer',
                     'description' => 'Transfert reçu de ' . ($user->name ?? $wallet->wallet_number),
                     'reference' => $senderTransaction->reference,
                     'metadata' => [
@@ -481,7 +541,11 @@ class WalletController extends Controller
                         'direction' => 'in',
                     ],
                 ]);
-                
+
+                // Mise à jour des timestamps
+                $wallet->update(['last_transaction_at' => now()]);
+                $recipientWallet->update(['last_transaction_at' => now()]);
+
                 // Notifications
                 Notification::create([
                     'user_id' => $user->id,
@@ -490,7 +554,7 @@ class WalletController extends Controller
                     'message' => 'Transfert de ' . number_format($validated['amount']) . ' XOF vers ' . $recipientWallet->wallet_number,
                     'data' => ['transaction_id' => $senderTransaction->id],
                 ]);
-                
+
                 Notification::create([
                     'user_id' => $recipientWallet->user_id,
                     'type' => 'transaction',
@@ -505,7 +569,6 @@ class WalletController extends Controller
                 'message' => 'Transfert effectué avec succès',
                 'new_balance' => $wallet->fresh()->balance
             ]);
-
         } catch (\Exception $e) {
             Log::error('Erreur transfert: ' . $e->getMessage());
             return response()->json([
@@ -515,6 +578,9 @@ class WalletController extends Controller
         }
     }
 
+    /**
+     * Gestion du PIN
+     */
     public function setPin(Request $request)
     {
         $validated = $request->validate([
@@ -524,7 +590,7 @@ class WalletController extends Controller
 
         $user = Auth::user();
         $wallet = Wallet::where('user_id', $user->id)->first();
-        
+
         if (!$wallet) {
             return response()->json([
                 'success' => false,
@@ -532,7 +598,6 @@ class WalletController extends Controller
             ], 404);
         }
 
-        // Vérifier le PIN actuel si fourni
         if ($validated['current_pin'] && !Hash::check($validated['current_pin'], $wallet->pin_hash)) {
             return response()->json([
                 'success' => false,
@@ -547,7 +612,6 @@ class WalletController extends Controller
                 'pin_changed_at' => now(),
             ]);
 
-            // Notification
             Notification::create([
                 'user_id' => $user->id,
                 'type' => 'security',
@@ -559,7 +623,6 @@ class WalletController extends Controller
                 'success' => true,
                 'message' => 'PIN mis à jour avec succès.'
             ]);
-
         } catch (\Exception $e) {
             Log::error('Erreur mise à jour PIN: ' . $e->getMessage());
             return response()->json([
@@ -577,7 +640,7 @@ class WalletController extends Controller
 
         $user = Auth::user();
         $wallet = Wallet::where('user_id', $user->id)->first();
-        
+
         if (!$wallet) {
             return response()->json([
                 'success' => false,
@@ -586,15 +649,14 @@ class WalletController extends Controller
         }
 
         if (Hash::check($validated['pin'], $wallet->pin_hash)) {
-            // Générer un token de session pour les opérations sensibles
             $token = bin2hex(random_bytes(32));
             session(['wallet_auth_token' => $token]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'PIN vérifié avec succès.',
                 'auth_token' => $token,
-                'valid_for' => 300 // 5 minutes
+                'valid_for' => 300
             ]);
         }
 
@@ -604,189 +666,22 @@ class WalletController extends Controller
         ], 400);
     }
 
-    // Méthodes Lygos
-    private function initiateLygosPayment($data)
-    {
-        $apiKey = config('services.lygos.api_key');
-        $apiUrl = config('services.lygos.api_url', 'https://api.lygosapp.com');
-
-        // Préparer les données pour Lygos selon leur API
-        $paymentData = [
-            'title' => 'Recharge de portefeuille BHDM',
-            'amount' => $data['amount'],
-            'description' => 'Dépôt sur le portefeuille BHDM - ' . $data['payment_method'],
-            'success-url' => route('client.wallet.deposit.callback'),
-            'failure-url' => route('client.wallet.deposit.callback'),
-            'metadata' => [
-                'user_id' => $data['user_id'],
-                'wallet_id' => $data['wallet_id'],
-                'transaction_id' => $data['transaction_id'],
-                'action' => 'deposit',
-            ],
-        ];
-
-        // Ajouter les détails selon la méthode de paiement
-        if ($data['payment_method'] === 'mobile_money' && isset($data['phone_number'])) {
-            $paymentData['customer_phone'] = $data['phone_number'];
-            $paymentData['mobile_operator'] = $data['mobile_operator'];
-        }
-
-        try {
-            $response = Http::withHeaders([
-                'api-key' => $apiKey,
-                'Accept' => 'application/json',
-            ])->post($apiUrl . '/v1/products', $paymentData);
-
-            Log::info('Requête Lygos paiement', [
-                'url' => $apiUrl . '/v1/products',
-                'data' => $paymentData,
-                'response_status' => $response->status(),
-                'response_body' => $response->body(),
-            ]);
-
-            if ($response->successful()) {
-                $result = $response->json();
-                return [
-                    'success' => true,
-                    'transaction_id' => $result['transaction_id'] ?? $result['id'] ?? null,
-                    'payment_url' => $result['payment_url'] ?? $result['url'] ?? null,
-                    'message' => 'Paiement initié avec succès',
-                ];
-            } else {
-                Log::error('Erreur API Lygos paiement', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-                
-                return [
-                    'success' => false,
-                    'message' => $response->json()['message'] ?? 'Erreur API Lygos: ' . $response->status(),
-                ];
-            }
-        } catch (\Exception $e) {
-            Log::error('Exception API Lygos paiement: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Erreur de connexion: ' . $e->getMessage(),
-            ];
-        }
-    }
-
-    private function initiateLygosPayout($data)
-    {
-        $apiKey = config('services.lygos.api_key');
-        $apiUrl = config('services.lygos.api_url', 'https://api.lygosapp.com');
-
-        // Note: Lygos pourrait ne pas avoir d'API de retrait directe
-        // Dans ce cas, on simule ou on utilise un autre service
-        // Cette méthode doit être adaptée selon la documentation de Lygos
-        
-        $payoutData = [
-            'amount' => $data['amount'],
-            'payout_method' => $data['payout_method'],
-            'callback_url' => route('client.wallet.withdraw.callback'),
-            'metadata' => [
-                'user_id' => $data['user_id'],
-                'wallet_id' => $data['wallet_id'],
-                'transaction_id' => $data['transaction_id'],
-                'action' => 'withdrawal',
-            ],
-        ];
-
-        if ($data['payout_method'] === 'mobile_money' && isset($data['phone_number'])) {
-            $payoutData['beneficiary'] = [
-                'phone' => $data['phone_number'],
-                'operator' => $data['mobile_operator'],
-            ];
-        } else if ($data['payout_method'] === 'bank_transfer') {
-            $payoutData['beneficiary'] = [
-                'name' => $data['account_name'],
-                'account_number' => $data['account_number'],
-                'bank_name' => $data['bank_name'],
-            ];
-        }
-
-        try {
-            // Pour les retraits, Lygos pourrait utiliser un endpoint différent
-            // Vérifiez la documentation de Lygos pour l'endpoint correct
-            $endpoint = '/v1/payouts'; // À vérifier dans la doc Lygos
-            
-            $response = Http::withHeaders([
-                'api-key' => $apiKey,
-                'Accept' => 'application/json',
-            ])->post($apiUrl . $endpoint, $payoutData);
-
-            Log::info('Requête Lygos retrait', [
-                'url' => $apiUrl . $endpoint,
-                'data' => $payoutData,
-                'response_status' => $response->status(),
-                'response_body' => $response->body(),
-            ]);
-
-            if ($response->successful()) {
-                $result = $response->json();
-                return [
-                    'success' => true,
-                    'transaction_id' => $result['transaction_id'] ?? $result['id'] ?? uniqid('LYGOS_'),
-                    'message' => 'Retrait initié avec succès',
-                ];
-            } else {
-                // Simulation pour développement
-                // En production, il faut utiliser l'API réelle de Lygos
-                Log::warning('API Lygos retrait non disponible, simulation', $payoutData);
-                
-                // Simulation d'une réponse réussie (à retirer en production)
-                return [
-                    'success' => true,
-                    'transaction_id' => 'LYGOS_' . uniqid(),
-                    'message' => 'Retrait initié (mode simulation)',
-                ];
-            }
-        } catch (\Exception $e) {
-            Log::error('Exception API Lygos retrait: ' . $e->getMessage());
-            
-            // Simulation pour développement (à retirer en production)
-            return [
-                'success' => true,
-                'transaction_id' => 'LYGOS_' . uniqid(),
-                'message' => 'Retrait initié (mode simulation)',
-            ];
-        }
-    }
-
-    private function verifyLygosCallback(Request $request)
-    {
-        // Lygos envoie probablement une signature dans les headers
-        $signature = $request->header('X-Lygos-Signature') ?? $request->header('X-Signature');
-        $payload = $request->getContent();
-        $secret = config('services.lygos.webhook_secret');
-
-        if (!$signature || !$secret) {
-            // Pour le développement, on peut accepter les callbacks sans signature
-            if (app()->environment('local', 'testing')) {
-                Log::warning('Vérification signature Lygos ignorée en développement');
-                return true;
-            }
-            return false;
-        }
-
-        $expectedSignature = hash_hmac('sha256', $payload, $secret);
-        return hash_equals($expectedSignature, $signature);
-    }
-
+    /**
+     * Méthodes utilitaires
+     */
     private function generateWalletNumber()
     {
         $currentYear = date('y');
         $currentMonth = date('m');
         $lastWallet = Wallet::latest()->first();
-        
+
         if ($lastWallet && strpos($lastWallet->wallet_number, 'WALLET-' . $currentYear . $currentMonth) === 0) {
             $lastNumber = intval(substr($lastWallet->wallet_number, -6));
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 1;
         }
-        
+
         return 'WALLET-' . $currentYear . $currentMonth . '-' . str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
     }
 
@@ -794,40 +689,38 @@ class WalletController extends Controller
     {
         try {
             $user = Auth::user();
-            
-            // Récupérer les financements en attente avec des changements récents
+
             $pendingFundings = FundingRequest::where('user_id', $user->id)
-                ->whereIn('status', ['approved', 'funded', 'pending'])
-                ->where('updated_at', '>', now()->subMinutes(5)) // Changements dans les 5 dernières minutes
+                ->whereIn('status', ['approved', 'paid', 'documents_validated', 'transfer_pending', 'completed'])
+                ->where('updated_at', '>', now()->subMinutes(5))
+                ->with(['fundingType', 'documents'])
                 ->get();
-            
+
             $updated = [];
-            
+
             foreach ($pendingFundings as $funding) {
-                // Vérifier si le statut a changé depuis la dernière vérification
                 $lastChecked = session()->get('last_funding_check_' . $funding->id, $funding->updated_at);
-                
+
                 if ($funding->updated_at->gt($lastChecked)) {
                     $updated[] = [
                         'id' => $funding->id,
                         'title' => $funding->title,
                         'status' => $funding->status,
                         'new_status' => $this->getStatusLabel($funding->status),
-                        'updated_at' => $funding->updated_at->format('d/m/Y H:i')
+                        'updated_at' => $funding->updated_at->format('d/m/Y H:i'),
+                        'request_number' => $funding->request_number ?? null,
                     ];
-                    
-                    // Mettre à jour le timestamp de dernière vérification
+
                     session()->put('last_funding_check_' . $funding->id, $funding->updated_at);
                 }
             }
-            
+
             return response()->json([
                 'success' => true,
                 'updated' => $updated,
                 'has_updates' => count($updated) > 0,
                 'timestamp' => now()->format('Y-m-d H:i:s')
             ]);
-            
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -837,50 +730,55 @@ class WalletController extends Controller
         }
     }
 
-    // Méthode pour obtenir le libellé du statut
     private function getStatusLabel($status)
     {
         $labels = [
             'pending' => 'En attente',
-            'approved' => 'Approuvé',
-            'rejected' => 'Rejeté',
-            'funded' => 'Financé',
-            'credited' => 'Accrédité',
-            'completed' => 'Terminé'
+            'submitted' => 'Soumise',
+            'under_review' => 'En examen',
+            'validated' => 'Validée',
+            'approved' => 'Approuvée',
+            'rejected' => 'Rejetée',
+            'paid' => 'Payée',
+            'documents_validated' => 'Documents validés',
+            'transfer_pending' => 'Transfert en attente',
+            'funded' => 'Financée',
+            'credited' => 'Accréditée',
+            'completed' => 'Terminée'
         ];
-        
+
         return $labels[$status] ?? $status;
     }
 
     public function fundingDetails($id)
     {
         try {
-            $funding = FundingRequest::with(['committeeDecision', 'payments'])
+            $funding = FundingRequest::with(['fundingType', 'documents', 'validator'])
                 ->where('user_id', Auth::id())
                 ->findOrFail($id);
-            
+
             return response()->json([
                 'success' => true,
                 'funding' => [
                     'id' => $funding->id,
                     'title' => $funding->title,
-                    'type' => $funding->type,
+                    'type' => $funding->is_predefined ? 'Prédéfinie' : 'Personnalisée',
                     'status' => $funding->status,
                     'status_label' => $this->getStatusLabel($funding->status),
                     'amount_requested' => $funding->amount_requested,
                     'amount_approved' => $funding->amount_approved,
+                    'expected_payment' => $funding->expected_payment,
+                    'request_number' => $funding->request_number,
                     'created_at' => $funding->created_at->format('d/m/Y'),
                     'updated_at' => $funding->updated_at->format('d/m/Y H:i'),
-                    'committee_decision' => $funding->committeeDecision ? [
-                        'committee_name' => $funding->committeeDecision->committee_name,
-                        'decision' => $funding->committeeDecision->decision,
-                        'approved_amount' => $funding->committeeDecision->approved_amount,
-                        'decision_date' => $funding->committeeDecision->decision_date?->format('d/m/Y'),
-                        'comments' => $funding->committeeDecision->comments
+                    'validated_at' => $funding->validated_at?->format('d/m/Y H:i'),
+                    'admin_notes' => $funding->admin_validation_notes,
+                    'validator' => $funding->validator ? [
+                        'name' => $funding->validator->name,
+                        'validated_at' => $funding->validated_at?->format('d/m/Y'),
                     ] : null,
                 ]
             ]);
-            
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -893,44 +791,53 @@ class WalletController extends Controller
     {
         try {
             $funding = FundingRequest::where('user_id', Auth::id())
-                ->where('status', 'funded')
+                ->whereIn('status', ['funded', 'completed', 'transfer_pending'])
                 ->findOrFail($id);
-            
-            // Vérifier si déjà crédité
+
             if ($funding->credited_at) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Ce financement a déjà été crédité'
                 ]);
             }
-            
-            // Créditer le portefeuille
+
+            if ($funding->is_predefined && $funding->transfer_status !== 'completed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le transfert n\'est pas encore finalisé par l\'administrateur'
+                ], 400);
+            }
+
             $wallet = Auth::user()->wallet;
             $amount = $funding->amount_approved ?? $funding->amount_requested;
-            
-            // Transaction pour assurer la cohérence
+
             DB::transaction(function () use ($wallet, $funding, $amount) {
-                // Mettre à jour le solde du portefeuille
-                $wallet->balance += $amount;
-                $wallet->save();
-                
-                // Marquer le financement comme crédité
+                $wallet->increment('balance', $amount);
+                $wallet->update(['last_transaction_at' => now()]);
+
                 $funding->update([
                     'credited_at' => now(),
                     'status' => 'credited'
                 ]);
-                
-                // Créer une transaction
+
                 Transaction::create([
                     'wallet_id' => $wallet->id,
-                    'type' => 'funding',
+                    'transaction_id' => (string) Str::uuid(),
+                    'type' => 'credit',
                     'amount' => $amount,
-                    'description' => 'Accréditation financement: ' . $funding->title,
+                    'total_amount' => $amount,
+                    'payment_method' => $funding->is_predefined ? 'bank_transfer' : 'kkiapay',
+                    'description' => 'Financement crédité: ' . $funding->request_number,
                     'status' => 'completed',
-                    'reference' => 'FUND-' . $funding->id
+                    'reference' => 'FUND-' . $funding->request_number,
+                    'metadata' => [
+                        'funding_request_id' => $funding->id,
+                        'funding_type' => $funding->is_predefined ? 'predefined' : 'custom',
+                        'previous_balance' => $wallet->balance - $amount,
+                        'new_balance' => $wallet->balance,
+                    ]
                 ]);
-                
-                // Notification
+
                 Notification::create([
                     'user_id' => $wallet->user_id,
                     'type' => 'transaction',
@@ -939,21 +846,20 @@ class WalletController extends Controller
                     'data' => ['funding_id' => $funding->id],
                 ]);
             });
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Financement crédité avec succès',
                 'new_balance' => $wallet->balance,
                 'credited_amount' => $amount
             ]);
-            
         } catch (\Exception $e) {
             Log::error('Error crediting funding', [
                 'user_id' => Auth::id(),
                 'funding_id' => $id,
                 'error' => $e->getMessage()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l\'accréditation'
@@ -966,41 +872,46 @@ class WalletController extends Controller
         try {
             $user = Auth::user();
             $wallet = Wallet::where('user_id', $user->id)->first();
-            
+
             if (!$wallet) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Portefeuille non trouvé'
                 ], 404);
             }
-            
-            // Calculer les statistiques pour les 30 derniers jours
+
             $thirtyDaysAgo = now()->subDays(30);
-            
+
             $stats = [
                 'total_deposits' => $wallet->transactions()
-                    ->where('type', 'deposit')
+                    ->where('type', 'credit')
                     ->where('status', 'completed')
                     ->where('created_at', '>=', $thirtyDaysAgo)
                     ->sum('amount'),
-                
+
                 'total_withdrawals' => $wallet->transactions()
-                    ->where('type', 'withdrawal')
+                    ->where('type', 'debit')
                     ->where('status', 'completed')
                     ->where('created_at', '>=', $thirtyDaysAgo)
                     ->sum('amount'),
-                
+
                 'total_transfers' => $wallet->transactions()
                     ->where('type', 'transfer')
                     ->where('status', 'completed')
                     ->where('created_at', '>=', $thirtyDaysAgo)
                     ->sum('amount'),
-                
+
+                'total_payments' => $wallet->transactions()
+                    ->where('type', 'payment')
+                    ->where('status', 'completed')
+                    ->where('created_at', '>=', $thirtyDaysAgo)
+                    ->sum('amount'),
+
                 'pending_transactions' => $wallet->transactions()
                     ->whereIn('status', ['pending', 'processing'])
                     ->count(),
             ];
-            
+
             return response()->json([
                 'success' => true,
                 'wallet' => [
@@ -1008,18 +919,17 @@ class WalletController extends Controller
                     'wallet_number' => $wallet->wallet_number,
                     'balance' => $wallet->balance,
                     'currency' => $wallet->currency,
-                    'security_level' => $wallet->security_level,
+                    'security_level' => $wallet->security_level ?? 'normal',
                     'created_at' => $wallet->created_at->format('d/m/Y'),
                 ],
                 'stats' => $stats,
-                'has_pin' => $wallet->security_level !== 'normal'
+                'has_pin' => ($wallet->security_level ?? 'normal') !== 'normal'
             ]);
-            
         } catch (\Exception $e) {
             Log::error('Error getting wallet info', [
                 'error' => $e->getMessage()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération des informations'
@@ -1032,15 +942,14 @@ class WalletController extends Controller
         try {
             $user = Auth::user();
             $wallet = Wallet::where('user_id', $user->id)->first();
-            
+
             if (!$wallet) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Portefeuille non trouvé'
                 ], 404);
             }
-            
-            // Définir les actions disponibles
+
             $actions = [
                 [
                     'id' => 'deposit',
@@ -1091,18 +1000,17 @@ class WalletController extends Controller
                     'description' => 'Générer un QR Code de paiement'
                 ]
             ];
-            
+
             return response()->json([
                 'success' => true,
                 'actions' => $actions,
                 'balance' => $wallet->balance
             ]);
-            
         } catch (\Exception $e) {
             Log::error('Error getting quick actions', [
                 'error' => $e->getMessage()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la récupération des actions'

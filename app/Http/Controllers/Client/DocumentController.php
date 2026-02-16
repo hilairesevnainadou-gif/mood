@@ -13,75 +13,76 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
+
 class DocumentController extends Controller
 {
     /**
      * Afficher la liste des documents
      */
- public function index()
-{
-    $user = Auth::user();
+    public function index()
+    {
+        $user = Auth::user();
 
-    // Documents de profil uniquement
-    $documents = Document::where('user_id', $user->id)
-        ->profileDocuments()
-        ->recentFirst()
-        ->get();
+        // Documents de profil uniquement
+        $documents = Document::where('user_id', $user->id)
+            ->profileDocuments()
+            ->recentFirst()
+            ->get();
 
-    // Types de documents requis selon le type d'utilisateur
-    $requiredDocuments = RequiredDocument::getByMemberType($user->member_type, true);
+        // Types de documents requis selon le type d'utilisateur
+        $requiredDocuments = RequiredDocument::getByMemberType($user->member_type, true);
 
-    // Vérifier les documents manquants
-    $missingDocuments = [];
-    $completedRequired = 0;
+        // Vérifier les documents manquants
+        $missingDocuments = [];
+        $completedRequired = 0;
 
-    foreach ($requiredDocuments as $requiredDoc) {
-        // Récupérer tous les documents de ce type (collection déjà chargée)
-        $docsOfType = $documents->where('type', $requiredDoc->document_type);
+        foreach ($requiredDocuments as $requiredDoc) {
+            // Récupérer tous les documents de ce type (collection déjà chargée)
+            $docsOfType = $documents->where('type', $requiredDoc->document_type);
 
-        // Vérifier si un document validé et non expiré existe (utilisation de filter pour collection)
-        $hasValidated = $docsOfType
-            ->where('status', 'validated')
-            ->filter(function ($doc) {
-                if ($doc->expiry_date) {
-                    return !$doc->is_expired && $doc->expiry_date->isFuture();
-                }
-                return true;
-            })
-            ->isNotEmpty();
+            // Vérifier si un document validé et non expiré existe (utilisation de filter pour collection)
+            $hasValidated = $docsOfType
+                ->where('status', 'validated')
+                ->filter(function ($doc) {
+                    if ($doc->expiry_date) {
+                        return !$doc->is_expired && $doc->expiry_date->isFuture();
+                    }
+                    return true;
+                })
+                ->isNotEmpty();
 
-        // Vérifier si un document est en attente (pending)
-        $hasPending = $docsOfType->where('status', 'pending')->isNotEmpty();
+            // Vérifier si un document est en attente (pending)
+            $hasPending = $docsOfType->where('status', 'pending')->isNotEmpty();
 
-        if ($hasValidated && $requiredDoc->is_required) {
-            // Document validé = compté comme complété
-            $completedRequired++;
-        } elseif (!$hasValidated && !$hasPending && $requiredDoc->is_required) {
-            // Manquant uniquement si : pas de document validé ET pas de document en attente
-            $missingDocuments[] = $requiredDoc;
+            if ($hasValidated && $requiredDoc->is_required) {
+                // Document validé = compté comme complété
+                $completedRequired++;
+            } elseif (!$hasValidated && !$hasPending && $requiredDoc->is_required) {
+                // Manquant uniquement si : pas de document validé ET pas de document en attente
+                $missingDocuments[] = $requiredDoc;
+            }
+            // Si hasPending = true mais hasValidated = false : ce n'est pas manquant, mais pas complété non plus
         }
-        // Si hasPending = true mais hasValidated = false : ce n'est pas manquant, mais pas complété non plus
+
+        // Calculer le pourcentage de complétion
+        $totalRequired = $requiredDocuments->where('is_required', true)->count();
+        $completionPercentage = $totalRequired > 0 ? round(($completedRequired / $totalRequired) * 100) : 100;
+
+        // Déterminer le mode d'affichage
+        $showMissingOnly = count($missingDocuments) > 0 && $completionPercentage < 100;
+        $showDocumentsOnly = $completionPercentage === 100;
+
+        return view('client.documents.index', compact(
+            'documents',
+            'requiredDocuments',
+            'missingDocuments',
+            'completionPercentage',
+            'completedRequired',
+            'totalRequired',
+            'showMissingOnly',
+            'showDocumentsOnly'
+        ));
     }
-
-    // Calculer le pourcentage de complétion
-    $totalRequired = $requiredDocuments->where('is_required', true)->count();
-    $completionPercentage = $totalRequired > 0 ? round(($completedRequired / $totalRequired) * 100) : 100;
-
-    // Déterminer le mode d'affichage
-    $showMissingOnly = count($missingDocuments) > 0 && $completionPercentage < 100;
-    $showDocumentsOnly = $completionPercentage === 100;
-
-    return view('client.documents.index', compact(
-        'documents',
-        'requiredDocuments',
-        'missingDocuments',
-        'completionPercentage',
-        'completedRequired',
-        'totalRequired',
-        'showMissingOnly',
-        'showDocumentsOnly'
-    ));
-}
     /**
      * Afficher le formulaire d'upload
      */
@@ -121,32 +122,41 @@ class DocumentController extends Controller
      */
     public function uploadDocument(Request $request)
     {
+        // Timeout court - si ça dépasse 30s, il y a un vrai problème
+        set_time_limit(30);
+
         $user = Auth::user();
 
-        // Log pour debug
-        Log::info('Upload document started', [
-            'user_id' => $user->id,
-            'type' => $request->input('type'),
-            'has_file' => $request->hasFile('document')
-        ]);
-
         try {
-            // Validation de base (champs texte)
-            $validator = Validator::make($request->all(), [
+            // Validation minimale
+            $validated = $request->validate([
                 'type' => 'required|string',
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string|max:1000',
-                'expiry_date' => 'nullable|date|after:today'
+                'expiry_date' => 'nullable|date|after:today',
+                'document' => 'required|file' // Pas de règle de taille ici
             ]);
 
-            if ($validator->fails()) {
-                return $this->jsonResponse(false, $validator->errors()->first(), null, 422);
+            // RÉCUPÉRER LE FICHIER IMMÉDIATEMENT
+            $file = $request->file('document');
+
+            // Capturer les infos du fichier
+            $fileSize = $file->getSize();
+            $fileMimeType = $file->getMimeType();
+            $originalName = $file->getClientOriginalName();
+            $extension = strtolower($file->getClientOriginalExtension());
+            $tempPath = $file->getPathname();
+
+            // Vérifier que le fichier existe
+            if (!file_exists($tempPath)) {
+                return $this->jsonResponse(false, 'Fichier temporaire introuvable. Veuillez réessayer.', null, 422);
             }
 
-            $documentType = $request->input('type');
+            $documentType = $validated['type'];
 
-            // Vérifier si le type de document est autorisé
-            $documentInfo = RequiredDocument::where('member_type', $user->member_type)
+            // Requête DB simple avec select minimal
+            $documentInfo = RequiredDocument::select(['id', 'name', 'allowed_formats', 'has_expiry_date', 'validity_days', 'is_required', 'category'])
+                ->where('member_type', $user->member_type)
                 ->where('document_type', $documentType)
                 ->where('is_active', true)
                 ->first();
@@ -155,134 +165,73 @@ class DocumentController extends Controller
                 return $this->jsonResponse(false, 'Type de document non autorisé.', null, 403);
             }
 
-            // Vérifier doublons
-            $existingPending = Document::where('user_id', $user->id)
-                ->where('type', $documentType)
-                ->where('is_profile_document', true)
-                ->where('status', 'pending')
-                ->first();
-
-            if ($existingPending) {
-                return $this->jsonResponse(false, 'Vous avez déjà un document en attente.', route('client.documents.index'), 422);
-            }
-
-            $existingValid = Document::where('user_id', $user->id)
-                ->where('type', $documentType)
-                ->where('is_profile_document', true)
-                ->where('status', 'validated')
-                ->where(function ($q) {
-                    $q->whereNull('expiry_date')
-                        ->orWhere('expiry_date', '>', now());
-                })
-                ->first();
-
-            if ($existingValid) {
-                return $this->jsonResponse(false, 'Vous avez déjà un document validé.', route('client.documents.index'), 422);
-            }
-
-            // Validation du fichier
-            if (!$request->hasFile('document')) {
-                return $this->jsonResponse(false, 'Aucun fichier sélectionné.', null, 422);
-            }
-
-            $file = $request->file('document');
-
-            // Vérifier que le fichier est valide
-            if (!$file->isValid()) {
-                return $this->jsonResponse(false, 'Fichier invalide ou corrompu.', null, 422);
-            }
-
-            // Validation taille et format
-            $maxSize = ($documentInfo->max_size_mb ?? 5) * 1024; // en KB
-            if ($file->getSize() > ($maxSize * 1024)) {
-                return $this->jsonResponse(false, 'Fichier trop volumineux (max ' . ($documentInfo->max_size_mb ?? 5) . ' Mo)', null, 422);
-            }
-
+            // Vérification format uniquement (PAS DE VALIDATION TAILLE)
             if ($documentInfo->allowed_formats && count($documentInfo->allowed_formats) > 0) {
-                $ext = strtolower($file->getClientOriginalExtension());
-                if (!in_array($ext, $documentInfo->allowed_formats)) {
-                    return $this->jsonResponse(false, 'Format non supporté. Formats: ' . implode(', ', $documentInfo->allowed_formats), null, 422);
+                if (!in_array($extension, $documentInfo->allowed_formats)) {
+                    return $this->jsonResponse(false, 'Format non supporté. Formats acceptés: ' . implode(', ', $documentInfo->allowed_formats), null, 422);
                 }
             }
 
-            // Vérifier date d'expiration si requise
-            if ($documentInfo->has_expiry_date && !$request->filled('expiry_date')) {
-                return $this->jsonResponse(false, 'La date d\'expiration est requise.', null, 422);
+            // Vérifier doublon PENDING uniquement (requête simple)
+            $hasPending = Document::where('user_id', $user->id)
+                ->where('type', $documentType)
+                ->where('is_profile_document', true)
+                ->where('status', 'pending')
+                ->exists(); // Utilise exists() au lieu de first() - plus rapide
+
+            if ($hasPending) {
+                return $this->jsonResponse(false, 'Vous avez déjà un document en attente de validation.', route('client.documents.index'), 422);
             }
 
-            // Upload fichier
-            $originalName = $file->getClientOriginalName();
-            $extension = $file->getClientOriginalExtension();
+            // STOCKAGE DIRECT - Pas de vérification complexe
             $filename = time() . '_' . Str::slug(pathinfo($originalName, PATHINFO_FILENAME)) . '.' . $extension;
+            $relativePath = 'documents/users/' . $user->id . '/' . $documentType;
 
-            $path = 'documents/users/' . $user->id . '/' . $documentType;
-
+            // Utiliser le storage Laravel directement (plus fiable que copy manuel)
             try {
-                $filePath = $file->storeAs($path, $filename, 'public');
+                $filePath = $file->storeAs($relativePath, $filename, 'public');
             } catch (\Exception $e) {
-                Log::error('Storage error: ' . $e->getMessage());
-                return $this->jsonResponse(false, 'Erreur lors de l\'enregistrement du fichier.', null, 500);
+                Log::error('Storage failed: ' . $e->getMessage());
+                return $this->jsonResponse(false, 'Erreur lors de l\'enregistrement du fichier. Veuillez réessayer.', null, 500);
             }
 
             // Calculer date expiration
-            $expiryDate = $request->input('expiry_date');
+            $expiryDate = $validated['expiry_date'] ?? null;
             if (!$expiryDate && $documentInfo->validity_days) {
                 $expiryDate = now()->addDays($documentInfo->validity_days)->format('Y-m-d');
             }
 
-            // Création document
-            $document = new Document();
-            $document->user_id = $user->id;
-            $document->type = $documentType;
-            $document->name = $request->input('name');
-            $document->original_filename = $originalName;
-            $document->path = $filePath;
-            $document->size = $file->getSize();
-            $document->mime_type = $file->getMimeType();
-            $document->description = $request->input('description');
-            $document->expiry_date = $expiryDate;
-            $document->status = 'pending';
-            $document->uploaded_at = now();
-            $document->is_profile_document = true;
-            $document->is_required = $documentInfo->is_required ?? true;
-            $document->category = $documentInfo->category ?? 'other';
+            // Création document - Insertion directe sans vérification complexe
+            $document = Document::create([
+                'user_id' => $user->id,
+                'type' => $documentType,
+                'name' => $validated['name'],
+                'original_filename' => $originalName,
+                'path' => $filePath,
+                'size' => $fileSize,
+                'mime_type' => $fileMimeType,
+                'description' => $validated['description'] ?? null,
+                'expiry_date' => $expiryDate,
+                'status' => 'pending',
+                'uploaded_at' => now(),
+                'is_profile_document' => true,
+                'is_required' => $documentInfo->is_required ?? true,
+                'category' => $documentInfo->category ?? 'other',
+                'is_expired' => ($expiryDate && now()->gt($expiryDate))
+            ]);
 
-            $document->save();
-
-            // Vérifier expiration immédiatement
-            if ($expiryDate && now()->gt($expiryDate)) {
-                $document->update(['is_expired' => true]);
-            }
-
-            // Notification (optionnel)
-            try {
-                if (class_exists(\App\Models\Notification::class)) {
-                    \App\Models\Notification::create([
-                        'user_id' => $user->id,
-                        'type' => 'document_uploaded',
-                        'title' => 'Document uploadé',
-                        'message' => 'Votre document "' . $documentInfo->name . '" est en attente de validation.',
-                        'data' => json_encode(['document_id' => $document->id]),
-                        'read' => false
-                    ]);
-                }
-            } catch (\Exception $e) {
-                Log::warning('Notification failed: ' . $e->getMessage());
-            }
-
-            Log::info('Upload successful', ['document_id' => $document->id]);
+            Log::info('Upload OK', ['doc_id' => $document->id, 'type' => $documentType]);
 
             return $this->jsonResponse(
                 true,
                 'Document uploadé avec succès ! Il sera validé par notre équipe.',
                 route('client.documents.index')
             );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->jsonResponse(false, $e->validator->errors()->first(), null, 422);
         } catch (\Exception $e) {
-            Log::error('Upload error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return $this->jsonResponse(false, 'Erreur serveur: ' . $e->getMessage(), null, 500);
+            Log::error('Upload error: ' . $e->getMessage());
+            return $this->jsonResponse(false, 'Une erreur est survenue. Veuillez réessayer.', null, 500);
         }
     }
 
@@ -416,7 +365,7 @@ class DocumentController extends Controller
                 'is_pdf' => $document->isPdf()
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error generating document URL: ' . $e->getMessage(), [
+            Log::error('Error generating document URL: ' . $e->getMessage(), [
                 'document_id' => $document->id,
                 'user_id' => $user->id
             ]);

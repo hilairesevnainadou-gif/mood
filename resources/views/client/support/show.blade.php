@@ -33,6 +33,232 @@
     @csrf
 </form>
 
+<div class="pwa-ticket-detail">
+    {{-- Header Mobile --}}
+    <div class="pwa-page-header">
+        <div class="pwa-header-bg"></div>
+        <div class="pwa-header-content">
+            <a href="{{ route('client.support.index') }}" class="pwa-back-btn">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="pwa-header-text">
+                <h1>Ticket #{{ $ticket->ticket_number }}</h1>
+                <p>{{ $ticket->category_label ?? ucfirst($ticket->category) }}</p>
+            </div>
+            <button type="button" class="pwa-header-action" onclick="toggleTicketMenu(event)">
+                <i class="fas fa-ellipsis-v"></i>
+            </button>
+        </div>
+
+        {{-- Menu actions rapides (dropdown) --}}
+        <div class="pwa-ticket-menu" id="ticketMenu">
+            @if ($ticket->canBeReplied())
+                <button type="button" onclick="focusReply()" class="pwa-menu-item">
+                    <i class="fas fa-reply"></i> Répondre
+                </button>
+            @endif
+            @if ($ticket->isOpen() || $ticket->isInProgress())
+                <button type="button" class="pwa-menu-item text-danger" onclick="confirmCloseTicket()">
+                    <i class="fas fa-times"></i> Fermer
+                </button>
+            @endif
+            @if ($ticket->isClosed() || $ticket->isResolved())
+                <button type="button" class="pwa-menu-item text-warning" onclick="confirmReopenTicket()">
+                    <i class="fas fa-redo"></i> Rouvrir
+                </button>
+            @endif
+        </div>
+    </div>
+
+    {{-- Info Card --}}
+    <div class="pwa-ticket-info-card">
+        <div class="pwa-ticket-status-row">
+            <div class="pwa-status-badge {{ $ticket->status }}">
+                @switch($ticket->status)
+                    @case('open')
+                        <i class="fas fa-clock"></i> Ouvert
+                        @break
+                    @case('in_progress')
+                        <i class="fas fa-sync-alt fa-spin"></i> En cours
+                        @break
+                    @case('resolved')
+                        <i class="fas fa-check-circle"></i> Résolu
+                        @break
+                    @default
+                        <i class="fas fa-times-circle"></i> Fermé
+                @endswitch
+            </div>
+            <span class="pwa-priority-badge {{ $ticket->priority }}">
+                {!! $ticket->priority_badge !!}
+            </span>
+        </div>
+
+        <h2 class="pwa-ticket-subject">{{ $ticket->subject }}</h2>
+
+        <div class="pwa-ticket-meta-grid">
+            <div class="pwa-meta-item">
+                <i class="fas fa-calendar"></i>
+                <span>{{ $ticket->created_at->format('d/m/Y') }}</span>
+            </div>
+            <div class="pwa-meta-item">
+                <i class="fas fa-user"></i>
+                <span>{{ $ticket->user->name }}</span>
+            </div>
+            @if ($ticket->assignee)
+                <div class="pwa-meta-item">
+                    <i class="fas fa-headset"></i>
+                    <span>{{ $ticket->assignee->name }}</span>
+                </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- Timeline --}}
+    <div class="pwa-section">
+        <h3 class="pwa-section-title">Progression</h3>
+        <div class="pwa-timeline">
+            @php
+                $steps = [
+                    ['key' => 'created', 'label' => 'Créé', 'date' => $ticket->created_at],
+                    ['key' => 'in_progress', 'label' => 'En cours', 'date' => $ticket->messages->where('is_admin', true)->first()?->created_at],
+                    ['key' => 'resolved', 'label' => 'Résolu', 'date' => $ticket->resolved_at],
+                    ['key' => 'closed', 'label' => 'Fermé', 'date' => $ticket->closed_at],
+                ];
+                $currentStepIndex = match($ticket->status) {
+                    'open' => 0,
+                    'in_progress' => 1,
+                    'resolved' => 2,
+                    'closed' => 3,
+                    default => 0
+                };
+            @endphp
+
+            @foreach($steps as $index => $step)
+                <div class="pwa-timeline-item {{ $index <= $currentStepIndex ? 'completed' : '' }}">
+                    <div class="pwa-timeline-dot"></div>
+                    <div class="pwa-timeline-content">
+                        <span>{{ $step['label'] }}</span>
+                        <small>{{ $step['date'] ? $step['date']->format('d/m') : '--' }}</small>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+
+    {{-- Description --}}
+    <div class="pwa-section">
+        <h3 class="pwa-section-title">Description</h3>
+        <div class="pwa-description-card">
+            {{ $ticket->description }}
+        </div>
+
+        @if ($ticket->metadata && isset($ticket->metadata['attachments']))
+            <div class="pwa-attachments-section">
+                <h4>Pièces jointes</h4>
+                <div class="pwa-attachments-list">
+                    @foreach ($ticket->metadata['attachments'] as $index => $attachment)
+                        <a href="{{ route('client.support.download-attachment', [
+                            'ticketId' => $ticket->id,
+                            'messageId' => 'ticket', // Identifiant spécial pour les pièces jointes du ticket principal
+                            'attachmentIndex' => $index,
+                        ]) }}" class="pwa-attachment-chip" target="_blank">
+                            <i class="fas fa-paperclip"></i>
+                            <span class="pwa-attachment-name">{{ Str::limit($attachment['name'], 20) }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    </div>
+
+    {{-- Conversation --}}
+    <div class="pwa-section">
+        <h3 class="pwa-section-title">
+            Conversation
+            <span class="pwa-message-count">{{ $ticket->messages->count() }}</span>
+        </h3>
+
+        <div class="pwa-messages-wrapper" id="messagesWrapper">
+            @forelse($ticket->messages->sortBy('created_at') as $message)
+                <div class="pwa-message-row {{ $message->is_admin ? 'admin' : 'client' }}">
+                    <div class="pwa-message-bubble">
+                        <div class="pwa-message-header">
+                            <span class="pwa-message-author">{{ $message->is_admin ? 'Support Client' : $message->user->name }}</span>
+                            <span class="pwa-message-time">{{ $message->created_at->format('H:i') }}</span>
+                        </div>
+
+                        <div class="pwa-message-content">
+                            {{ $message->message }}
+                        </div>
+
+                        @if (is_array($message->attachments) && count($message->attachments) > 0)
+                            <div class="pwa-message-attachments">
+                                @foreach ($message->attachments as $index => $attachment)
+                                    @php
+                                        $attachmentName = $attachment['name'] ?? 'Fichier_' . ($index + 1);
+                                        $attachmentPath = $attachment['path'] ?? null;
+                                    @endphp
+
+                                    @if ($attachmentPath)
+                                        <a href="{{ route('support.download-attachment', [
+                                            'ticketId' => $ticket->id,
+                                            'messageId' => $message->id,
+                                            'attachmentIndex' => $index,
+                                        ]) }}" class="pwa-attachment-link" target="_blank">
+                                            <i class="fas fa-download"></i>
+                                            {{ Str::limit($attachmentName, 20) }}
+                                            <small>({{ isset($attachment['size']) ? number_format($attachment['size'] / 1024, 1) . ' KB' : 'N/A' }})</small>
+                                        </a>
+                                    @endif
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                    <div class="pwa-message-avatar">
+                        {{ strtoupper(substr($message->is_admin ? 'S' : $message->user->name, 0, 1)) }}
+                    </div>
+                </div>
+            @empty
+                <div class="pwa-empty-conversation">
+                    <i class="fas fa-comments"></i>
+                    <p>Aucun message pour le moment</p>
+                    @if ($ticket->canBeReplied())
+                        <button type="button" onclick="focusReply()" class="pwa-btn-primary sm">
+                            Envoyer un message
+                        </button>
+                    @endif
+                </div>
+            @endforelse
+        </div>
+    </div>
+
+    {{-- Espace pour la barre de saisie --}}
+    <div style="height: 200px;"></div>
+</div>
+
+{{-- Formulaire de réponse --}}
+@if ($ticket->canBeReplied())
+    <div class="pwa-reply-bar" id="replyForm">
+        <form action="{{ route('client.support.reply', $ticket->id) }}" method="POST" enctype="multipart/form-data" id="replyFormElement">
+            @csrf
+            <div class="pwa-reply-input-group">
+                <button type="button" class="pwa-attachment-btn" onclick="document.getElementById('replyAttachments').click()" title="Ajouter des pièces jointes">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <input type="file" id="replyAttachments" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx" style="display: none;">
+
+                <textarea name="message" id="replyTextarea" class="pwa-reply-textarea" placeholder="Écrivez votre message..." rows="1" required></textarea>
+
+                <button type="submit" class="pwa-send-btn" title="Envoyer">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+
+            <div id="attachmentPreview" class="pwa-attachment-preview-container"></div>
+        </form>
+    </div>
+@endif
+
 <script>
     // Fonctions du Modal
     function openModal(config) {
@@ -118,318 +344,90 @@
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeModal();
     });
-</script>
 
-<div class="pwa-ticket-detail">
-    {{-- Header Mobile --}}
-    <div class="pwa-page-header">
-        <div class="pwa-header-bg"></div>
-        <div class="pwa-header-content">
-            <a href="{{ route('client.support') }}" class="pwa-back-btn">
-                <i class="fas fa-arrow-left"></i>
-            </a>
-            <div class="pwa-header-text">
-                <h1>Ticket #{{ $ticket->ticket_number }}</h1>
-                <p>{{ $ticket->category_label }}</p>
-            </div>
-            <button type="button" class="pwa-header-action" onclick="toggleTicketMenu(event)">
-                <i class="fas fa-ellipsis-v"></i>
-            </button>
-        </div>
+    // Gestion upload fichiers et textarea auto-resize
+    document.addEventListener('DOMContentLoaded', function() {
+        const textarea = document.getElementById('replyTextarea');
+        if (textarea) {
+            textarea.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+            });
+        }
 
-        {{-- Menu actions rapides (dropdown) --}}
-        <div class="pwa-ticket-menu" id="ticketMenu">
-            @if ($ticket->canBeReplied())
-                <button type="button" onclick="focusReply()" class="pwa-menu-item">
-                    <i class="fas fa-reply"></i> Répondre
-                </button>
-            @endif
-            @if ($ticket->isOpen() || $ticket->isInProgress())
-                <button type="button" class="pwa-menu-item text-danger" onclick="confirmCloseTicket()">
-                    <i class="fas fa-times"></i> Fermer
-                </button>
-            @endif
-            @if ($ticket->isClosed() || $ticket->isResolved())
-                <button type="button" class="pwa-menu-item text-warning" onclick="confirmReopenTicket()">
-                    <i class="fas fa-redo"></i> Rouvrir
-                </button>
-            @endif
-        </div>
-    </div>
+        // Scroll vers le dernier message
+        const messagesWrapper = document.getElementById('messagesWrapper');
+        if (messagesWrapper && messagesWrapper.lastElementChild) {
+            messagesWrapper.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
 
-    {{-- Le reste du contenu reste identique... --}}
-    {{-- Info Card --}}
-    <div class="pwa-ticket-info-card">
-        <div class="pwa-ticket-status-row">
-            <div class="pwa-status-badge {{ $ticket->status }}">
-                @if ($ticket->status == 'open')
-                    <i class="fas fa-clock"></i> Ouvert
-                @elseif($ticket->status == 'in_progress')
-                    <i class="fas fa-sync-alt fa-spin"></i> En cours
-                @elseif($ticket->status == 'resolved')
-                    <i class="fas fa-check-circle"></i> Résolu
-                @else
-                    <i class="fas fa-times-circle"></i> Fermé
-                @endif
-            </div>
-            <span class="pwa-priority-badge {{ $ticket->priority }}">
-                {!! $ticket->priority_badge !!}
-            </span>
-        </div>
+        // Gestion des pièces jointes
+        const fileInput = document.getElementById('replyAttachments');
+        const previewContainer = document.getElementById('attachmentPreview');
+        let filesArray = [];
 
-        <h2 class="pwa-ticket-subject">{{ $ticket->subject }}</h2>
-
-        <div class="pwa-ticket-meta-grid">
-            <div class="pwa-meta-item">
-                <i class="fas fa-calendar"></i>
-                <span>{{ $ticket->created_at->format('d/m/Y') }}</span>
-            </div>
-            <div class="pwa-meta-item">
-                <i class="fas fa-user"></i>
-                <span>{{ $ticket->user->name }}</span>
-            </div>
-            @if ($ticket->assignee)
-                <div class="pwa-meta-item">
-                    <i class="fas fa-headset"></i>
-                    <span>{{ $ticket->assignee->name }}</span>
-                </div>
-            @endif
-        </div>
-    </div>
-
-    {{-- Timeline --}}
-    <div class="pwa-section">
-        <h3 class="pwa-section-title">Progression</h3>
-        <div class="pwa-timeline">
-            <div class="pwa-timeline-item {{ in_array($ticket->status, ['open', 'in_progress', 'resolved', 'closed']) ? 'completed' : '' }}">
-                <div class="pwa-timeline-dot"></div>
-                <div class="pwa-timeline-content">
-                    <span>Créé</span>
-                    <small>{{ $ticket->created_at->format('d/m') }}</small>
-                </div>
-            </div>
-            <div class="pwa-timeline-item {{ in_array($ticket->status, ['in_progress', 'resolved', 'closed']) ? 'completed' : '' }}">
-                <div class="pwa-timeline-dot"></div>
-                <div class="pwa-timeline-content">
-                    <span>En cours</span>
-                    <small>
-                        @if ($ticket->messages->where('is_admin', true)->count() > 0)
-                            {{ $ticket->messages->where('is_admin', true)->first()->created_at->format('d/m') }}
-                        @else
-                            --
-                        @endif
-                    </small>
-                </div>
-            </div>
-            <div class="pwa-timeline-item {{ in_array($ticket->status, ['resolved', 'closed']) ? 'completed' : '' }}">
-                <div class="pwa-timeline-dot"></div>
-                <div class="pwa-timeline-content">
-                    <span>Résolu</span>
-                    <small>{{ $ticket->resolved_at ? $ticket->resolved_at->format('d/m') : '--' }}</small>
-                </div>
-            </div>
-            <div class="pwa-timeline-item {{ $ticket->status == 'closed' ? 'completed' : '' }}">
-                <div class="pwa-timeline-dot"></div>
-                <div class="pwa-timeline-content">
-                    <span>Fermé</span>
-                    <small>{{ $ticket->closed_at ? $ticket->closed_at->format('d/m') : '--' }}</small>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Description --}}
-    <div class="pwa-section">
-        <h3 class="pwa-section-title">Description</h3>
-        <div class="pwa-description-card">
-            {{ $ticket->description }}
-        </div>
-
-        @if ($ticket->metadata && isset($ticket->metadata['attachments']))
-            <div class="pwa-attachments-section">
-                <h4>Pièces jointes</h4>
-                <div class="pwa-attachments-list">
-                    @foreach ($ticket->metadata['attachments'] as $attachment)
-                        <a href="{{ asset('storage/' . $attachment['path']) }}" target="_blank" class="pwa-attachment-chip">
-                            <i class="fas fa-paperclip"></i>
-                            <span class="pwa-attachment-name">{{ \Illuminate\Support\Str::limit($attachment['name'], 20) }}</span>
-                        </a>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-    </div>
-
-    {{-- Conversation --}}
-    <div class="pwa-section">
-        <h3 class="pwa-section-title">
-            Conversation
-            <span class="pwa-message-count">{{ $ticket->messages->count() }}</span>
-        </h3>
-
-        <div class="pwa-messages-wrapper" id="messagesWrapper">
-            @forelse($ticket->messages->sortBy('created_at') as $message)
-                <div class="pwa-message-row {{ $message->is_admin ? 'admin' : 'client' }}">
-                    <div class="pwa-message-bubble">
-                        <div class="pwa-message-header">
-                            <span class="pwa-message-author">{{ $message->is_admin ? 'Support Client' : $message->user->name }}</span>
-                            <span class="pwa-message-time">{{ $message->created_at->format('H:i') }}</span>
-                        </div>
-
-                        <div class="pwa-message-content">
-                            {{ $message->message }}
-                        </div>
-
-                        @if (is_array($message->attachments) && count($message->attachments) > 0)
-                            <div class="pwa-message-attachments">
-                                @foreach ($message->attachments as $index => $attachment)
-                                    @php
-                                        $attachmentName = $attachment['name'] ?? 'Fichier_' . ($index + 1);
-                                        $attachmentPath = $attachment['path'] ?? null;
-                                    @endphp
-
-                                    @if ($attachmentPath)
-                                        <a href="{{ route('client.support.download-attachment', [
-                                            'ticketId' => $ticket->id,
-                                            'messageId' => $message->id,
-                                            'attachmentIndex' => $index,
-                                        ]) }}" class="pwa-attachment-link" target="_blank">
-                                            <i class="fas fa-download"></i>
-                                            {{ \Illuminate\Support\Str::limit($attachmentName, 20) }}
-                                            <small>({{ isset($attachment['size']) ? number_format($attachment['size'] / 1024, 1) . ' KB' : 'N/A' }})</small>
-                                        </a>
-                                    @endif
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-                    <div class="pwa-message-avatar">
-                        {{ strtoupper(substr($message->is_admin ? 'S' : $message->user->name, 0, 1)) }}
-                    </div>
-                </div>
-            @empty
-                <div class="pwa-empty-conversation">
-                    <i class="fas fa-comments"></i>
-                    <p>Aucun message pour le moment</p>
-                    @if ($ticket->canBeReplied())
-                        <button type="button" onclick="focusReply()" class="pwa-btn-primary sm">
-                            Envoyer un message
-                        </button>
-                    @endif
-                </div>
-            @endforelse
-        </div>
-    </div>
-
-    {{-- Espace pour la barre de saisie --}}
-    <div style="height: 200px;"></div>
-</div>
-
-{{-- Formulaire de réponse --}}
-@if ($ticket->canBeReplied())
-    <div class="pwa-reply-bar" id="replyForm">
-        <form action="{{ route('client.support.reply', $ticket->id) }}" method="POST" enctype="multipart/form-data" id="replyFormElement">
-            @csrf
-            <div class="pwa-reply-input-group">
-                <button type="button" class="pwa-attachment-btn" onclick="document.getElementById('replyAttachments').click()" title="Ajouter des pièces jointes">
-                    <i class="fas fa-paperclip"></i>
-                </button>
-                <input type="file" id="replyAttachments" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx" style="display: none;">
-
-                <textarea name="message" id="replyTextarea" class="pwa-reply-textarea" placeholder="Écrivez votre message..." rows="1" required></textarea>
-
-                <button type="submit" class="pwa-send-btn" title="Envoyer">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-
-            <div id="attachmentPreview" class="pwa-attachment-preview-container"></div>
-        </form>
-    </div>
-
-    <script>
-        // Gestion upload fichiers
-        (function() {
-            const textarea = document.getElementById('replyTextarea');
-            if (textarea) {
-                textarea.addEventListener('input', function() {
-                    this.style.height = 'auto';
-                    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
-                });
-            }
-
-            const messagesWrapper = document.getElementById('messagesWrapper');
-            if (messagesWrapper && messagesWrapper.lastElementChild) {
-                messagesWrapper.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }
-
-            const fileInput = document.getElementById('replyAttachments');
-            const previewContainer = document.getElementById('attachmentPreview');
-            let filesArray = [];
-
-            if (fileInput) {
-                fileInput.addEventListener('change', function(e) {
-                    const newFiles = Array.from(e.target.files);
-                    filesArray = [...filesArray, ...newFiles];
-                    updateFileInput();
-                    renderPreview();
-                });
-            }
-
-            function formatFileSize(bytes) {
-                if (bytes === 0) return '0 Bytes';
-                const k = 1024;
-                const sizes = ['Bytes', 'KB', 'MB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-            }
-
-            function getFileIcon(filename) {
-                const ext = filename.split('.').pop().toLowerCase();
-                const icons = {
-                    'pdf': 'fa-file-pdf',
-                    'doc': 'fa-file-word',
-                    'docx': 'fa-file-word',
-                    'jpg': 'fa-file-image',
-                    'jpeg': 'fa-file-image',
-                    'png': 'fa-file-image'
-                };
-                return icons[ext] || 'fa-file';
-            }
-
-            function updateFileInput() {
-                const dataTransfer = new DataTransfer();
-                filesArray.forEach(file => dataTransfer.items.add(file));
-                fileInput.files = dataTransfer.files;
-            }
-
-            function renderPreview() {
-                if (!previewContainer) return;
-                previewContainer.innerHTML = '';
-
-                filesArray.forEach((file, index) => {
-                    const item = document.createElement('div');
-                    item.className = 'pwa-preview-item';
-                    item.innerHTML = `
-                        <i class="fas ${getFileIcon(file.name)}"></i>
-                        <span class="pwa-preview-name" title="${file.name}">${file.name}</span>
-                        <span class="pwa-preview-size">(${formatFileSize(file.size)})</span>
-                        <button type="button" class="pwa-preview-remove" onclick="window.removeAttachment(${index})" title="Supprimer">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    `;
-                    previewContainer.appendChild(item);
-                });
-            }
-
-            window.removeAttachment = function(index) {
-                filesArray.splice(index, 1);
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                const newFiles = Array.from(e.target.files);
+                filesArray = [...filesArray, ...newFiles];
                 updateFileInput();
                 renderPreview();
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'pdf': 'fa-file-pdf',
+                'doc': 'fa-file-word',
+                'docx': 'fa-file-word',
+                'jpg': 'fa-file-image',
+                'jpeg': 'fa-file-image',
+                'png': 'fa-file-image'
             };
-        })();
-    </script>
-@endif
+            return icons[ext] || 'fa-file';
+        }
+
+        function updateFileInput() {
+            const dataTransfer = new DataTransfer();
+            filesArray.forEach(file => dataTransfer.items.add(file));
+            fileInput.files = dataTransfer.files;
+        }
+
+        function renderPreview() {
+            if (!previewContainer) return;
+            previewContainer.innerHTML = '';
+
+            filesArray.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'pwa-preview-item';
+                item.innerHTML = `
+                    <i class="fas ${getFileIcon(file.name)}"></i>
+                    <span class="pwa-preview-name" title="${file.name}">${file.name}</span>
+                    <span class="pwa-preview-size">(${formatFileSize(file.size)})</span>
+                    <button type="button" class="pwa-preview-remove" onclick="removeAttachment(${index})" title="Supprimer">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                previewContainer.appendChild(item);
+            });
+        }
+
+        window.removeAttachment = function(index) {
+            filesArray.splice(index, 1);
+            updateFileInput();
+            renderPreview();
+        };
+    });
+</script>
 
 <style>
     /* MODAL STYLES */
@@ -573,7 +571,7 @@
         box-shadow: 0 6px 16px rgba(217, 119, 6, 0.4);
     }
 
-    /* Reste des styles identiques... */
+    /* Layout principal */
     .pwa-ticket-detail {
         padding: 0;
         max-width: 100%;
@@ -718,7 +716,7 @@
         text-align: center;
     }
 
-    /* Info Card, Timeline, Description... (identique) */
+    /* Info Card */
     .pwa-ticket-info-card {
         margin: 0 1rem 1rem;
         padding: 1rem;
@@ -771,6 +769,7 @@
         color: var(--secondary-600, #475569);
     }
 
+    /* Sections */
     .pwa-section {
         padding: 0 1rem;
         margin-bottom: 1.25rem;
@@ -851,7 +850,7 @@
         color: var(--secondary-700, #334155);
     }
 
-    /* Description & Messages */
+    /* Description */
     .pwa-description-card {
         background: white;
         padding: 1rem;
@@ -863,6 +862,49 @@
         white-space: pre-wrap;
     }
 
+    .pwa-attachments-section {
+        margin-top: 1rem;
+    }
+
+    .pwa-attachments-section h4 {
+        font-size: 0.8rem;
+        color: var(--secondary-600, #475569);
+        margin-bottom: 0.5rem;
+    }
+
+    .pwa-attachments-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .pwa-attachment-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.5rem 0.75rem;
+        background: white;
+        border: 1px solid var(--secondary-200, #e2e8f0);
+        border-radius: 8px;
+        font-size: 0.8rem;
+        color: var(--secondary-700, #334155);
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .pwa-attachment-chip:hover {
+        background: var(--secondary-50, #f8fafc);
+        border-color: var(--primary-300, #93c5fd);
+    }
+
+    .pwa-attachment-name {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Messages */
     .pwa-messages-wrapper {
         display: flex;
         flex-direction: column;

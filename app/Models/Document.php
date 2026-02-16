@@ -37,6 +37,8 @@ class Document extends Model
         'validated_at' => 'datetime',
         'expiry_date' => 'date',
         'uploaded_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
         'size' => 'integer',
         'is_profile_document' => 'boolean',
         'is_required' => 'boolean',

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -48,11 +49,11 @@ class User extends Authenticatable
         'preferences',
         'metadata',
         'project_name',
-    'project_type',
-    'project_description',
-    'funding_needed',
-    'expected_jobs',
-    'project_duration',
+        'project_type',
+        'project_description',
+        'funding_needed',
+        'expected_jobs',
+        'project_duration',
     ];
 
     protected $hidden = [
@@ -79,33 +80,64 @@ class User extends Authenticatable
     ];
 
     // Accessors
-    public function getFullNameAttribute()
+    public function getFullNameAttribute(): string
     {
         return $this->first_name && $this->last_name
             ? $this->first_name . ' ' . $this->last_name
-            : $this->name;
+            : ($this->name ?? 'Utilisateur');
     }
 
-    public function getInitialsAttribute()
+    public function getInitialsAttribute(): string
     {
         if ($this->first_name && $this->last_name) {
             return strtoupper(substr($this->first_name, 0, 1) . substr($this->last_name, 0, 1));
         }
-        return strtoupper(substr($this->name, 0, 2));
+        return strtoupper(substr($this->name ?? 'U', 0, 2));
+    }
+ /**
+     * Send the email verification notification.
+     * OVERRIDE de la méthode par défaut de MustVerifyEmail
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        // Envoyer via notre Mailable personnalisée au lieu de la notification par défaut
+        Mail::to($this->email)->send(new CustomVerifyEmail($this));
     }
 
-    public function getProfilePhotoUrlAttribute()
+    /**
+     * Get the e-mail address where password reset links are sent.
+     */
+    public function getEmailForVerification(): string
+    {
+        return $this->email;
+    }
+
+    /**
+     * Accessor pour l'URL de la photo de profil
+     * CORRIGÉ : Le fichier est stocké dans storage/app/public/profiles/
+     */
+    public function getProfilePhotoUrlAttribute(): string
     {
         if ($this->profile_photo) {
-            return asset('storage/' . $this->profile_photo);
+            // Vérifier si le fichier existe dans le dossier profiles/
+            if (Storage::disk('public')->exists('profiles/' . $this->profile_photo)) {
+                return asset('storage/profiles/' . $this->profile_photo);
+            }
         }
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->full_name) . '&color=1b5a8d&background=e9ecef';
+        
+        // Fallback vers UI Avatars avec le nom complet
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->full_name) . '&background=random&color=fff&size=128';
     }
 
     // Relations
     public function wallets()
     {
         return $this->hasMany(Wallet::class);
+    }
+
+    public function wallet()
+    {
+        return $this->hasOne(Wallet::class)->latest();
     }
 
     public function fundingRequests()
@@ -123,15 +155,20 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class);
     }
 
- public function supportTickets()
-{
-    return $this->hasMany(SupportTicket::class);
-}
+    public function supportTickets()
+    {
+        return $this->hasMany(SupportTicket::class);
+    }
 
-public function supportMessages()
-{
-    return $this->hasMany(SupportMessage::class);
-}
+    public function supportMessages()
+    {
+        return $this->hasMany(SupportMessage::class);
+    }
+
+    public function assignedTickets()
+    {
+        return $this->hasMany(SupportTicket::class, 'assigned_to');
+    }
 
     public function progress()
     {
@@ -143,9 +180,48 @@ public function supportMessages()
         return $this->hasMany(Repayment::class);
     }
 
+    /**
+     * Relation transactions corrigée - évite les problèmes de requête
+     */
     public function transactions()
     {
-        return $this->hasManyThrough(Transaction::class, Wallet::class);
+        return $this->hasManyThrough(
+            Transaction::class,
+            Wallet::class,
+            'user_id',      // Clé étrangère sur wallets
+            'wallet_id',    // Clé étrangère sur transactions
+            'id',           // Clé locale sur users
+            'id'            // Clé locale sur wallets
+        );
+    }
+
+    /**
+     * Vérifie si l'utilisateur a des transactions en attente
+     * Correction du problème de guillemets dans la requête
+     */
+    public function hasPendingTransactions(): bool
+    {
+        return $this->transactions()
+            ->where('transactions.status', 'pending') // Table prefixée pour éviter ambiguïté
+            ->exists();
+    }
+
+    /**
+     * Vérifie si l'utilisateur a des demandes de financement en cours
+     */
+    public function hasPendingFundingRequests(): bool
+    {
+        return $this->fundingRequests()
+            ->whereIn('status', ['pending', 'processing', 'under_review'])
+            ->exists();
+    }
+
+    /**
+     * Vérifie si l'utilisateur a des opérations en cours (transactions OU financement)
+     */
+    public function hasPendingOperations(): bool
+    {
+        return $this->hasPendingTransactions() || $this->hasPendingFundingRequests();
     }
 
     public function committeeDecisions()
@@ -153,7 +229,7 @@ public function supportMessages()
         return $this->hasManyThrough(CommitteeDecision::class, FundingRequest::class);
     }
 
-    // AJOUTEZ CETTE RELATION - Formations
+    // Formations
     public function trainings()
     {
         return $this->belongsToMany(Training::class, 'training_user', 'user_id', 'training_id')
@@ -161,9 +237,19 @@ public function supportMessages()
             ->withTimestamps();
     }
 
-    public function wallet()
+    public function settings()
     {
-        return $this->hasOne(Wallet::class);
+        return $this->hasOne(Setting::class);
+    }
+
+    public function requests()
+    {
+        return $this->hasMany(FundingRequest::class);
+    }
+
+    public function fundingDocuments()
+    {
+        return $this->hasMany(FundingDocument::class);
     }
 
     // Scopes
@@ -184,7 +270,7 @@ public function supportMessages()
 
     public function scopeClients($query)
     {
-        return $query->where('is_admin', false);
+        return $query->where('is_admin', false)->where('is_moderator', false);
     }
 
     public function scopeByCountry($query, $country)
@@ -202,33 +288,33 @@ public function supportMessages()
         return $query->where('member_type', 'entreprise');
     }
 
-    // Méthodes
-    public function isAdministrator()
+    // Méthodes de vérification
+    public function isAdministrator(): bool
     {
         return $this->is_admin === true;
     }
 
-    public function isModerator()
+    public function isModerator(): bool
     {
         return $this->is_moderator === true;
     }
 
-    public function isClient()
+    public function isClient(): bool
     {
         return !$this->is_admin && !$this->is_moderator;
     }
 
-    public function isParticulier()
+    public function isParticulier(): bool
     {
         return $this->member_type === 'particulier';
     }
 
-    public function isEntreprise()
+    public function isEntreprise(): bool
     {
         return $this->member_type === 'entreprise';
     }
 
-    public function hasPermission($permission)
+    public function hasPermission($permission): bool
     {
         if ($this->isAdministrator()) {
             return true;
@@ -253,7 +339,8 @@ public function supportMessages()
         return in_array($permission, $clientPermissions);
     }
 
-    public function generateMemberId()
+    // Méthodes utilitaires
+    public function generateMemberId(): string
     {
         if (!$this->member_id) {
             $year = date('Y');
@@ -264,7 +351,7 @@ public function supportMessages()
         return $this->member_id;
     }
 
-    public function recordLogin($request)
+    public function recordLogin($request): void
     {
         $this->update([
             'last_login_at' => now(),
@@ -273,35 +360,25 @@ public function supportMessages()
         ]);
     }
 
-    public function getCompletionPercentage()
+    public function getCompletionPercentage(): int
     {
         $profileFields = [
             'first_name',
             'last_name',
             'email',
             'phone',
-            'profile_photo',
             'birth_date',
-            'gender',
             'address',
             'city',
             'country',
-            'postal_code',
-            'company_name',
-            'job_title'
         ];
 
-        $completedFields = 0;
-        foreach ($profileFields as $field) {
-            if (!empty($this->$field)) {
-                $completedFields++;
-            }
-        }
+        $completedFields = collect($profileFields)->filter(fn($field) => !empty($this->$field))->count();
 
-        return round(($completedFields / count($profileFields)) * 100);
+        return (int) round(($completedFields / count($profileFields)) * 100);
     }
 
-    // AJOUTEZ CETTE MÉTHODE - Récupérer les formations en cours
+    // Méthodes formations
     public function getEnrolledTrainings()
     {
         return $this->trainings()
@@ -310,7 +387,6 @@ public function supportMessages()
             ->get();
     }
 
-    // AJOUTEZ CETTE MÉTHODE - Récupérer les formations complétées
     public function getCompletedTrainings()
     {
         return $this->trainings()
@@ -319,8 +395,7 @@ public function supportMessages()
             ->get();
     }
 
-    // AJOUTEZ CETTE MÉTHODE - Vérifier si l'utilisateur est inscrit à une formation
-    public function isEnrolledInTraining($trainingId)
+    public function isEnrolledInTraining($trainingId): bool
     {
         return $this->trainings()
             ->where('training_id', $trainingId)
@@ -328,61 +403,35 @@ public function supportMessages()
             ->exists();
     }
 
-    // AJOUTEZ CETTE MÉTHODE - Récupérer la progression d'une formation
-    public function getTrainingProgress($trainingId)
+    public function getTrainingProgress($trainingId): int
     {
         $training = $this->trainings()
             ->where('training_id', $trainingId)
             ->first();
 
-        return $training ? $training->pivot->progress : 0;
+        return $training ? (int) $training->pivot->progress : 0;
     }
 
-
-    public function assignedTickets()
+    // Méthodes documents
+    public function hasAllRequiredDocuments(): bool
     {
-        return $this->hasMany(SupportTicket::class, 'assigned_to');
+        $missing = Document::getMissingRequiredDocuments($this->id, $this->member_type);
+        return empty($missing);
     }
 
-    // Relation pour les paramètres
-    public function settings()
+    public function hasUploadedRequiredDocuments(): bool
     {
-        return $this->hasOne(Setting::class);
+        $missing = Document::getMissingUploadedRequiredDocuments($this->id, $this->member_type);
+        return empty($missing);
     }
 
-    // Relation pour les requêtes de financement
-    public function requests()
+    public function getMissingRequiredDocuments()
     {
-        return $this->hasMany(FundingRequest::class);
+        return Document::getMissingRequiredDocuments($this->id, $this->member_type);
     }
 
-
-public function fundingDocuments()
-{
-    return $this->hasMany(FundingDocument::class);
-}
-
-// Méthode pour vérifier si l'utilisateur a tous les documents requis
-public function hasAllRequiredDocuments()
-{
-    $missing = Document::getMissingRequiredDocuments($this->id, $this->member_type);
-    return empty($missing);
-}
-
-public function hasUploadedRequiredDocuments()
-{
-    $missing = Document::getMissingUploadedRequiredDocuments($this->id, $this->member_type);
-    return empty($missing);
-}
-
-// Méthode pour obtenir les documents manquants
-public function getMissingRequiredDocuments()
-{
-    return Document::getMissingRequiredDocuments($this->id, $this->member_type);
-}
-
-public function getMissingUploadedRequiredDocuments()
-{
-    return Document::getMissingUploadedRequiredDocuments($this->id, $this->member_type);
-}
+    public function getMissingUploadedRequiredDocuments()
+    {
+        return Document::getMissingUploadedRequiredDocuments($this->id, $this->member_type);
+    }
 }

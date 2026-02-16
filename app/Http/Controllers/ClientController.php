@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Auth\Events\PasswordReset; 
+use Illuminate\Support\Str;
 
 class ClientController extends Controller
 {
@@ -73,23 +75,138 @@ class ClientController extends Controller
         return view('auth.login');
     }
 
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+public function login(Request $request)
+{
+    $credentials = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+        'remember' => 'boolean',
+    ]);
+
+    // Récupérer l'utilisateur par email pour vérifications AVANT authentification
+    $user = \App\Models\User::where('email', $credentials['email'])->first();
+
+    // Vérifier si l'utilisateur existe
+    if (!$user) {
+        return back()
+            ->withInput($request->only('email'))
+            ->withErrors(['email' => 'Ces identifiants ne correspondent pas à nos enregistrements.']);
+    }
+
+    //  VÉRIFICATION CRITIQUE : Compte désactivé (is_active = 0)
+    if (!$user->is_active) {
+        Log::warning('Tentative de connexion sur compte désactivé', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
         ]);
 
-        if (Auth::attempt($credentials, $request->remember)) {
-            $request->session()->regenerate();
+        return back()
+            ->withInput($request->only('email'))
+            ->withErrors(['email' => 'Votre compte a été désactivé. Veuillez contacter l\'administrateur.']);
+    }
 
-            return redirect()->intended('client/dashboard');
-        }
+    // Vérifier si l'utilisateur est un admin (redirection vers portail admin)
+    if ($user->is_admin || $user->member_type === 'admin') {
+        return redirect()->route('admin.login')
+            ->with('info', 'Veuillez utiliser le portail administrateur pour vous connecter.');
+    }
 
-        return back()->withErrors([
-            'email' => 'Les identifiants sont incorrects.',
+    // Tentative d'authentification pour les clients uniquement
+    if (!Auth::attempt($credentials, $request->boolean('remember'))) {
+        Log::info('Échec de connexion client', [
+            'email' => $credentials['email'],
+            'ip' => $request->ip(),
+        ]);
+
+        return back()
+            ->withInput($request->only('email'))
+            ->withErrors(['email' => 'Les identifiants sont incorrects.']);
+    }
+
+    $request->session()->regenerate();
+
+    $authenticatedUser = Auth::user();
+
+    // Vérification double du statut actif
+    if (!$authenticatedUser->is_active) {
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return back()
+            ->withInput($request->only('email'))
+            ->withErrors(['email' => 'Votre compte a été désactivé.']);
+    }
+
+    // Mise à jour des informations de connexion
+    try {
+        $authenticatedUser->update([
+            'last_login_at' => now(),
+            'last_login_ip' => $request->ip(),
+            'last_login_device' => $request->userAgent(),
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Erreur mise à jour last_login', [
+            'user_id' => $authenticatedUser->id,
+            'error' => $e->getMessage(),
         ]);
     }
+
+    // Notification de connexion
+    try {
+        \App\Models\Notification::create([
+            'user_id' => $authenticatedUser->id,
+            'type' => 'security',
+            'title' => 'Nouvelle connexion détectée',
+            'message' => 'Connexion depuis ' . $request->ip() . ' le ' . now()->format('d/m/Y à H:i'),
+            'is_read' => false,
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Erreur création notification', ['error' => $e->getMessage()]);
+    }
+
+    // Stockage session
+    session([
+        'user_id' => $authenticatedUser->id,
+        'user_member_type' => $authenticatedUser->member_type,
+        'user_full_name' => $authenticatedUser->full_name,
+        'user_profile_photo' => $authenticatedUser->profile_photo_url,
+        'login_time' => now()->toDateTimeString(),
+    ]);
+
+    Log::info('Connexion client réussie', [
+        'user_id' => $authenticatedUser->id,
+        'email' => $authenticatedUser->email,
+    ]);
+
+    return redirect()->intended('client/dashboard');
+}
+
+/**
+ * Détermine la redirection selon le profil utilisateur
+ */
+private function determineRedirect(\App\Models\User $user): string
+{
+    // Si profil incomplet, rediriger vers complétion
+    if ($user->getCompletionPercentage() < 50) {
+        return route('client.profile.complete');
+    }
+
+    // Si documents requis manquants
+    if (!$user->hasUploadedRequiredDocuments()) {
+        return route('client.documents.upload');
+    }
+
+    // Si email non vérifié
+    if (!$user->is_verified || !$user->email_verified_at) {
+        return route('client.verification.notice');
+    }
+
+    // Redirection par défaut
+    return route('client.dashboard');
+}
+
 
     public function showRegisterForm()
     {
@@ -302,6 +419,7 @@ class ClientController extends Controller
                 ->withInput();
         }
     }
+
     // ============= MÉTHODES AUXILIAIRES =============
     private function generateMemberId()
     {
@@ -367,40 +485,90 @@ class ClientController extends Controller
         return 'REQ-' . $currentYear . '-' . $timestamp . '-' . $random;
     }
 
-    public function sendResetLink(Request $request)
+      public function sendResetLink(Request $request)
     {
-        $request->validate(['email' => 'required|email']);
+        $request->validate([
+            'email' => 'required|email|exists:users,email'
+        ], [
+            'email.exists' => 'Cette adresse email n\'est pas enregistrée.'
+        ]);
+
+        // Supprimer les anciens tokens pour cet email (évite les conflits)
+        \DB::table('password_resets')->where('email', $request->email)->delete();
 
         $status = Password::sendResetLink(
             $request->only('email')
         );
 
-        return $status === Password::RESET_LINK_SENT
-            ? back()->with(['status' => __($status)])
-            : back()->withErrors(['email' => __($status)]);
-    }
-
-    public function resetPassword(Request $request)
-    {
-        $request->validate([
-            'token' => 'required',
-            'email' => 'required|email',
-            'password' => 'required|min:8|confirmed',
+        \Log::info('Envoi lien reset', [
+            'email' => $request->email,
+            'status' => $status,
+            'token_exists' => \DB::table('password_resets')->where('email', $request->email)->exists()
         ]);
 
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user, $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password),
-                ])->save();
-            }
-        );
-
-        return $status == Password::PASSWORD_RESET
-            ? redirect()->route('login')->with('status', __($status))
-            : back()->withErrors(['email' => [__($status)]]);
+        return $status === Password::RESET_LINK_SENT
+            ? back()->with(['status' => 'Un lien de réinitialisation a été envoyé à votre adresse email.'])
+            : back()->withErrors(['email' => 'Impossible d\'envoyer le lien. Veuillez réessayer.']);
     }
+
+    
+  /**
+ * Réinitialiser le mot de passe - VERSION CORRIGÉE ET SIMPLIFIÉE
+ */
+public function resetPassword(Request $request)
+{
+    $request->validate([
+        'token' => 'required|string',
+        'email' => 'required|email',
+        'password' => [
+            'required',
+            'string',
+            'min:8',
+            'confirmed',
+            'regex:/[A-Z]/',      
+            'regex:/[a-z]/',      
+            'regex:/[0-9]/',      
+            'regex:/[!@#$%^&*(),.?":{}|<>]/'  
+        ],
+    ], [
+        'password.regex' => 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial.',
+        'password.confirmed' => 'Les mots de passe ne correspondent pas.'
+    ]);
+
+    // Utiliser le PasswordBroker de Laravel (méthode standard)
+    $status = Password::reset(
+        $request->only('email', 'password', 'password_confirmation', 'token'),
+        function ($user, $password) {
+            $user->forceFill([
+                'password' => Hash::make($password),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            // Événement Laravel standard
+            event(new \Illuminate\Auth\Events\PasswordReset($user));
+        }
+    );
+
+    Log::info('Tentative reset password', [
+        'email' => $request->email,
+        'status' => $status
+    ]);
+
+    if ($status === Password::PASSWORD_RESET) {
+        return redirect()
+            ->route('login')
+            ->with('status', 'Votre mot de passe a été réinitialisé avec succès !');
+    }
+
+    // Si échec, retourner avec erreur
+    return back()
+        ->withInput()
+        ->withErrors(['email' => match($status) {
+            Password::INVALID_TOKEN => 'Le lien de réinitialisation est invalide ou a expiré.',
+            Password::INVALID_USER => 'Aucun utilisateur trouvé avec cet email.',
+            default => 'Une erreur est survenue lors de la réinitialisation.'
+        }]);
+}
 
     public function submitTest(Request $request)
     {
@@ -459,436 +627,6 @@ class ClientController extends Controller
     | Méthodes de l'espace client
     |--------------------------------------------------------------------------
     */
-
-    public function dashboard()
-    {
-        $user = Auth::user();
-
-        // Vérification de l'email
-        if (! $user->hasVerifiedEmail()) {
-            return redirect()->route('verification.notice')
-                ->with('warning', 'Veuillez vérifier votre adresse email pour accéder au tableau de bord.');
-        }
-
-        $missingDocuments = $user->getMissingUploadedRequiredDocuments();
-
-        if (! empty($missingDocuments)) {
-            $missingNames = collect($missingDocuments)
-                ->pluck('name')
-                ->filter()
-                ->values()
-                ->implode(', ');
-
-            $message = 'Veuillez télécharger vos pièces d\'identité obligatoires pour accéder au tableau de bord.';
-
-            if ($missingNames !== '') {
-                $message = 'Documents manquants : ' . $missingNames . '. Veuillez les télécharger pour accéder au tableau de bord.';
-            }
-
-            return redirect()->route('client.documents.index')
-                ->with('warning', $message);
-        }
-
-        // Récupérer ou créer le wallet
-        $wallet = Wallet::where('user_id', $user->id)->first();
-
-        if (! $wallet) {
-            $walletNumber = $this->generateWalletNumber();
-            $defaultPin = '000000';
-            $wallet = Wallet::create([
-                'user_id' => $user->id,
-                'wallet_number' => $walletNumber,
-                'balance' => 0,
-                'currency' => 'XOF',
-                'pin_hash' => Hash::make($defaultPin),
-                'security_level' => 'normal',
-            ]);
-        }
-
-        $requests = FundingRequest::where('user_id', $user->id)
-            ->latest()
-            ->limit(5)
-            ->get();
-
-        $notifications = Notification::where('user_id', $user->id)
-            ->latest()
-            ->limit(5)
-            ->get();
-
-        $recentTransactions = $wallet->transactions()
-            ->latest()
-            ->limit(5)
-            ->get();
-
-        // Statistiques générales communes
-        $generalStats = [
-            'active_requests' => FundingRequest::where('user_id', $user->id)
-                ->whereIn('status', ['pending', 'processing'])
-                ->count(),
-
-            'approved_requests' => FundingRequest::where('user_id', $user->id)
-                ->where('status', 'approved')
-                ->count(),
-
-            'active_trainings' => $user->trainings()
-                ->wherePivot('status', 'enrolled')
-                ->count(),
-
-            'completed_trainings' => $user->trainings()
-                ->wherePivot('status', 'completed')
-                ->count(),
-
-            'pending_actions' => $this->calculatePendingActions($user),
-
-            'new_requests' => FundingRequest::where('user_id', $user->id)
-                ->whereDate('created_at', '>=', now()->subDays(7))
-                ->count(),
-
-            'wallet_change' => $this->calculateWalletChange($wallet),
-        ];
-
-        // Progression du profil
-        $user->profile_completion = $user->getCompletionPercentage();
-
-        // Statistiques spécifiques selon le type de compte
-        if ($user->isEntreprise()) {
-            $entrepriseStats = $this->getEntrepriseStats($user);
-
-            return view('client.dashboard.entreprise', compact(
-                'user',
-                'wallet',
-                'requests',
-                'notifications',
-                'recentTransactions',
-                'generalStats',
-                'entrepriseStats'
-            ));
-        } else {
-            $particulierStats = $this->getParticulierStats($user);
-
-            return view('client.dashboard.particulier', compact(
-                'user',
-                'wallet',
-                'requests',
-                'notifications',
-                'recentTransactions',
-                'generalStats',
-                'particulierStats'
-            ));
-        }
-    }
-
-    private function getEntrepriseStats($user)
-    {
-        $allRequests = FundingRequest::where('user_id', $user->id)->get();
-
-        // Calculer le montant total demandé et approuvé
-        $totalRequested = $allRequests->sum('amount_requested');
-        $totalApproved = $allRequests->where('status', 'approved')->sum('amount_approved');
-
-        // Calculer les emplois créés (à partir des projets approuvés)
-        $jobsCreated = $allRequests->where('status', 'approved')->sum('expected_jobs');
-
-        // Calculer le revenu attendu total
-        $expectedRevenue = $allRequests->where('status', 'approved')->sum('expected_revenue');
-
-        // Projets par statut
-        $projectsByStatus = [
-            'pending' => $allRequests->where('status', 'pending')->count(),
-            'processing' => $allRequests->where('status', 'processing')->count(),
-            'approved' => $allRequests->where('status', 'approved')->count(),
-            'rejected' => $allRequests->where('status', 'rejected')->count(),
-            'completed' => $allRequests->where('status', 'completed')->count(),
-        ];
-
-        // Projets par type
-        $projectsByType = $allRequests->groupBy('project_type')->map->count();
-
-        return [
-            'total_projects' => $allRequests->count(),
-            'total_requested' => $totalRequested,
-            'total_approved' => $totalApproved,
-            'jobs_created' => $jobsCreated,
-            'expected_revenue' => $expectedRevenue,
-            'projects_by_status' => $projectsByStatus,
-            'projects_by_type' => $projectsByType,
-            'company_size' => $user->employees_count > 0 ? $this->getCompanySizeCategory($user->employees_count) : 'Non spécifié',
-            'annual_turnover' => $user->annual_turnover ? number_format($user->annual_turnover, 0, ',', ' ') . ' XOF' : 'Non spécifié',
-            'sector' => $user->sector ?? 'Non spécifié',
-            'registration_number' => $user->registration_number ?? 'Non spécifié',
-        ];
-    }
-
-    private function getParticulierStats($user)
-    {
-        $allRequests = FundingRequest::where('user_id', $user->id)->get();
-
-        // Demande personnelle par type
-        $personalLoans = $allRequests->where('category', 'loan');
-        $personalGrants = $allRequests->where('category', 'grant');
-        $trainingRequests = $allRequests->where('category', 'training');
-
-        // Formations complétées avec certificats
-        $certificates = Certificate::where('user_id', $user->id)->count();
-
-        // Progression moyenne dans les formations
-        $enrolledTrainings = $user->trainings()->wherePivot('status', 'enrolled')->get();
-        $averageProgress = $enrolledTrainings->isNotEmpty()
-            ? round($enrolledTrainings->avg('pivot.progress'), 1)
-            : 0;
-
-        // Documents uploadés par type
-        $documents = Document::where('user_id', $user->id)->get();
-        $documentsByType = $documents->groupBy('type')->map->count();
-
-        // Assistance technique utilisée
-        $supportTickets = SupportTicket::where('user_id', $user->id)->count();
-
-        return [
-            'total_requests' => $allRequests->count(),
-            'personal_loans' => [
-                'count' => $personalLoans->count(),
-                'total_requested' => $personalLoans->sum('amount_requested'),
-                'total_approved' => $personalLoans->where('status', 'approved')->sum('amount_approved'),
-            ],
-            'personal_grants' => [
-                'count' => $personalGrants->count(),
-                'total_requested' => $personalGrants->sum('amount_requested'),
-                'total_approved' => $personalGrants->where('status', 'approved')->sum('amount_approved'),
-            ],
-            'training_requests' => [
-                'count' => $trainingRequests->count(),
-                'approved' => $trainingRequests->where('status', 'approved')->count(),
-            ],
-            'certificates_earned' => $certificates,
-            'average_training_progress' => $averageProgress,
-            'documents_by_type' => $documentsByType,
-            'support_tickets' => $supportTickets,
-            'profession' => $user->profession ?? 'Non spécifié',
-            'skills_developed' => $this->getUserSkills($user),
-            'learning_path' => $this->getLearningPath($user),
-        ];
-    }
-
-    private function getCompanySizeCategory($employeesCount)
-    {
-        if ($employeesCount <= 10) {
-            return 'TPE (Très Petite Entreprise)';
-        }
-        if ($employeesCount <= 50) {
-            return 'PME (Petite et Moyenne Entreprise)';
-        }
-        if ($employeesCount <= 250) {
-            return 'ETI (Entreprise de Taille Intermédiaire)';
-        }
-
-        return 'Grande Entreprise';
-    }
-
-    private function getUserSkills($user)
-    {
-        // Cette méthode pourrait récupérer les compétences développées à partir des formations complétées
-        $completedTrainings = $user->trainings()->wherePivot('status', 'completed')->get();
-
-        $skills = [];
-        foreach ($completedTrainings as $training) {
-            if ($training->skills) {
-                $trainingSkills = explode(',', $training->skills);
-                $skills = array_merge($skills, $trainingSkills);
-            }
-        }
-
-        return array_unique(array_map('trim', $skills));
-    }
-
-    private function getLearningPath($user)
-    {
-        // Recommandations de parcours d'apprentissage basées sur les intérêts
-        $enrolledCategories = $user->trainings()->with('category')->get()->pluck('category.name')->unique()->toArray();
-
-        if (empty($enrolledCategories)) {
-            return ['Développement personnel', 'Gestion financière', 'Création d\'entreprise'];
-        }
-
-        return $enrolledCategories;
-    }
-
-    private function calculatePendingActions($user)
-    {
-        $count = 0;
-
-        $count += Document::where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->count();
-
-        $count += FundingRequest::where('user_id', $user->id)
-            ->whereIn('status', ['pending', 'requires_info'])
-            ->count();
-
-        $count += SupportTicket::where('user_id', $user->id)
-            ->whereIn('status', ['open', 'waiting'])
-            ->count();
-
-        return $count;
-    }
-
-    private function calculateWalletChange($wallet)
-    {
-        if (! $wallet) {
-            return 0;
-        }
-
-        $startOfMonth = now()->startOfMonth();
-        $endOfMonth = now()->endOfMonth();
-
-        $deposits = $wallet->transactions()
-            ->where('type', 'deposit')
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum('amount');
-
-        $withdrawals = $wallet->transactions()
-            ->where('type', 'withdrawal')
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum('amount');
-
-        $netChange = $deposits - $withdrawals;
-        $previousBalance = max(1, $wallet->balance - $netChange);
-
-        return round(($netChange / $previousBalance) * 100, 1);
-    }
-
-    public function wallet()
-    {
-        $user = Auth::user();
-        $wallet = Wallet::where('user_id', $user->id)->first();
-
-        if (! $wallet) {
-            $walletNumber = $this->generateWalletNumber();
-            $defaultPin = '000000';
-            $wallet = Wallet::create([
-                'user_id' => $user->id,
-                'wallet_number' => $walletNumber,
-                'balance' => 0,
-                'currency' => 'XOF',
-                'pin_hash' => Hash::make($defaultPin),
-                'security_level' => 'normal',
-            ]);
-        }
-
-        $transactions = $wallet->transactions()->latest()->paginate(10);
-
-        return view('client.wallet.index', compact('wallet', 'transactions'));
-    }
-
-    public function deposit(Request $request)
-    {
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:1000',
-            'payment_method' => 'required|in:mobile_money,bank_transfer',
-            'phone_number' => 'required_if:payment_method,mobile_money|string|max:20',
-            'transaction_id' => 'nullable|string|max:100',
-        ]);
-
-        $user = Auth::user();
-        $wallet = Wallet::where('user_id', $user->id)->first();
-
-        if (! $wallet) {
-            return redirect()->back()->with('error', 'Portefeuille non trouvé.');
-        }
-
-        $transaction = $wallet->transactions()->create([
-            'type' => 'deposit',
-            'amount' => $validated['amount'],
-            'status' => 'pending',
-            'payment_method' => $validated['payment_method'],
-            'description' => 'Dépôt via ' . $validated['payment_method'],
-            'metadata' => [
-                'phone_number' => $validated['phone_number'] ?? null,
-                'transaction_id' => $validated['transaction_id'] ?? null,
-            ],
-        ]);
-
-        Notification::create([
-            'user_id' => $user->id,
-            'type' => 'transaction',
-            'title' => 'Dépôt en attente',
-            'message' => 'Votre dépôt de ' . number_format($validated['amount']) . ' XOF est en attente de validation.',
-            'data' => ['transaction_id' => $transaction->id],
-        ]);
-
-        return redirect()->route('client.wallet')->with('success', 'Dépôt initié avec succès !');
-    }
-
-    public function withdraw(Request $request)
-    {
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:1000',
-            'account_number' => 'required|string',
-            'account_name' => 'required|string',
-            'bank_name' => 'required|string',
-            'swift_code' => 'nullable|string|max:20',
-        ]);
-
-        $user = Auth::user();
-        $wallet = Wallet::where('user_id', $user->id)->first();
-
-        if (! $wallet) {
-            return redirect()->back()->with('error', 'Portefeuille non trouvé.');
-        }
-
-        if ($wallet->balance < $validated['amount']) {
-            return redirect()->back()->with('error', 'Solde insuffisant !');
-        }
-
-        $wallet->decrement('balance', $validated['amount']);
-
-        $transaction = $wallet->transactions()->create([
-            'type' => 'withdrawal',
-            'amount' => $validated['amount'],
-            'status' => 'pending',
-            'description' => 'Retrait vers ' . $validated['bank_name'],
-            'metadata' => [
-                'account_number' => $validated['account_number'],
-                'account_name' => $validated['account_name'],
-                'bank_name' => $validated['bank_name'],
-                'swift_code' => $validated['swift_code'] ?? null,
-            ],
-        ]);
-
-        Notification::create([
-            'user_id' => $user->id,
-            'type' => 'transaction',
-            'title' => 'Retrait initié',
-            'message' => 'Votre retrait de ' . number_format($validated['amount']) . ' XOF a été initié.',
-            'data' => ['transaction_id' => $transaction->id],
-        ]);
-
-        return redirect()->route('client.wallet')->with('success', 'Demande de retrait soumise avec succès !');
-    }
-
-    public function transactions()
-    {
-        $user = Auth::user();
-        $wallet = Wallet::where('user_id', $user->id)->first();
-
-        if (! $wallet) {
-            $transactions = collect();
-        } else {
-            $transactions = $wallet->transactions()
-                ->latest()
-                ->paginate(20);
-        }
-
-        return view('client.transactions', compact('transactions'));
-    }
-
-    public function requests()
-    {
-        $user = Auth::user();
-        $requests = FundingRequest::where('user_id', $user->id)->latest()->paginate(10);
-
-        return view('client.requests.index', compact('requests'));
-    }
 
     public function createRequest()
     {
@@ -1043,234 +781,8 @@ class ClientController extends Controller
 
         return redirect()->route('client.requests')->with('success', 'Demande supprimée avec succès !');
     }
-    /**
-     * Affiche le profil
-     */
-    public function profile()
-    {
-        $user = Auth::user();
-        return view('client.profile', compact('user'));
-    }
 
-    /**
-     * Met à jour le profil complet (infos + photo + mot de passe)
-     * Version unifiée recommandée
-     */
-    public function updateProfile(Request $request)
-    {
-        $user = Auth::user();
 
-        // DEBUG : Log des données reçues
-        Log::info('Update Profile Request', [
-            'has_file' => $request->hasFile('photo'),
-            'file_valid' => $request->file('photo') ? $request->file('photo')->isValid() : false,
-            'all_inputs' => $request->except(['password', 'current_password']),
-        ]);
-
-        // Validation
-        $rules = [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'phone' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:500',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-        ];
-
-        if ($request->filled('new_password')) {
-            $rules['current_password'] = 'required|string';
-            $rules['new_password'] = 'required|string|min:8|confirmed';
-        }
-
-        $validated = $request->validate($rules);
-
-        // Préparation des données
-        $userData = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? $user->phone,
-            'address' => $validated['address'] ?? $user->address,
-        ];
-
-        // GESTION DE LA PHOTO - CORRIGÉE
-        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
-
-            try {
-                // 1. Supprimer l'ancienne photo si existe
-                if ($user->profile_photo && Storage::disk('public')->exists('profiles/' . $user->profile_photo)) {
-                    Storage::disk('public')->delete('profiles/' . $user->profile_photo);
-                    Log::info('Ancienne photo supprimée', ['filename' => $user->profile_photo]);
-                }
-
-                // 2. Générer un nom unique
-                $extension = $request->file('photo')->getClientOriginalExtension();
-                $filename = 'profile_' . $user->id . '_' . time() . '.' . $extension;
-
-                // 3. Stocker la nouvelle photo
-                $path = $request->file('photo')->storeAs('profiles', $filename, 'public');
-
-                if ($path) {
-                    $userData['profile_photo'] = $filename;
-                    Log::info('Nouvelle photo sauvegardée', ['path' => $path, 'filename' => $filename]);
-                } else {
-                    Log::error('Échec du stockage de la photo');
-                    return redirect()->back()->with('error', 'Erreur lors de la sauvegarde de la photo');
-                }
-            } catch (\Exception $e) {
-                Log::error('Exception lors du traitement de la photo', ['error' => $e->getMessage()]);
-                return redirect()->back()->with('error', 'Erreur technique: ' . $e->getMessage());
-            }
-        }
-
-        // Mise à jour mot de passe si fourni
-        if ($request->filled('new_password')) {
-            if (!Hash::check($request->current_password, $user->password)) {
-                return redirect()->back()
-                    ->withErrors(['current_password' => 'Le mot de passe actuel est incorrect.'])
-                    ->withInput();
-            }
-
-            $userData['password'] = Hash::make($request->new_password);
-
-            Notification::create([
-                'user_id' => $user->id,
-                'type' => 'security',
-                'title' => 'Mot de passe modifié',
-                'message' => 'Votre mot de passe a été changé avec succès.',
-            ]);
-        }
-
-        // Sauvegarde en base
-        $user->update($userData);
-
-        Log::info('Profil mis à jour', ['user_id' => $user->id, 'data' => $userData]);
-
-        return redirect()->back()->with('success', 'Profil mis à jour avec succès !');
-    }
-
-    /**
-     * Méthode alternative : Change uniquement le mot de passe (si formulaire séparé)
-     * À utiliser si vous préférez séparer les actions
-     */
-    public function changePassword(Request $request)
-    {
-        $request->validate([
-            'current_password' => 'required|string',
-            'new_password' => 'required|string|min:8|confirmed',
-        ], [
-            'new_password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
-        ]);
-
-        $user = Auth::user();
-
-        // Vérification du mot de passe actuel
-        if (!Hash::check($request->current_password, $user->password)) {
-            return redirect()->back()
-                ->withErrors(['current_password' => 'Le mot de passe actuel est incorrect.']);
-        }
-
-        // Mise à jour
-        $user->update([
-            'password' => Hash::make($request->new_password),
-        ]);
-
-        // Notification
-        Notification::create([
-            'user_id' => $user->id,
-            'type' => 'security',
-            'title' => 'Mot de passe changé',
-            'message' => 'Votre mot de passe a été changé avec succès.',
-        ]);
-
-        return redirect()->back()->with('success', 'Mot de passe changé avec succès !');
-    }
-
-    /**
-     * Supprime la photo de profil
-     */
-    public function removePhoto()
-    {
-        $user = Auth::user();
-
-        if ($user->profile_photo && Storage::exists('public/profiles/' . $user->profile_photo)) {
-            Storage::delete('public/profiles/' . $user->profile_photo);
-            $user->update(['profile_photo' => null]);
-        }
-
-        return redirect()->back()->with('success', 'Photo de profil supprimée.');
-    }
-
-    // public function documents()
-    // {
-    //     $user = Auth::user();
-    //     $documents = Document::where('user_id', $user->id)->latest()->get();
-
-    //     return view('client.documents', compact('documents'));
-    // }
-
-    // public function uploadDocument(Request $request)
-    // {
-    //     $user = Auth::user();
-
-    //     // Types de documents spécifiques selon le type d'utilisateur
-    //     $documentTypes = $user->isEntreprise()
-    //         ? ['id_card', 'proof_address', 'business_registration', 'tax_certificate', 'financial_statements', 'project_documents', 'other']
-    //         : ['id_card', 'proof_address', 'tax_certificate', 'income_proof', 'other'];
-
-    //     $validated = $request->validate([
-    //         'document' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
-    //         'type' => 'required|in:' . implode(',', $documentTypes),
-    //         'description' => 'nullable|string|max:500',
-    //     ]);
-
-    //     if ($request->hasFile('document')) {
-    //         $filename = time() . '_' . $user->id . '_' . $request->document->getClientOriginalName();
-    //         $path = $request->document->storeAs('public/documents', $filename);
-
-    //         $document = Document::create([
-    //             'user_id' => $user->id,
-    //             'filename' => $filename,
-    //             'original_name' => $request->document->getClientOriginalName(),
-    //             'type' => $validated['type'],
-    //             'description' => $validated['description'],
-    //             'size' => $request->document->getSize(),
-    //             'mime_type' => $request->document->getMimeType(),
-    //             'status' => 'pending',
-    //         ]);
-
-    //         Notification::create([
-    //             'user_id' => $user->id,
-    //             'type' => 'document',
-    //             'title' => 'Document uploadé',
-    //             'message' => 'Votre document "' . $document->original_name . '" a été uploadé avec succès.',
-    //             'data' => ['document_id' => $document->id],
-    //         ]);
-
-    //         return redirect()->back()->with('success', 'Document uploadé avec succès !');
-    //     }
-
-    //     return redirect()->back()->with('error', 'Erreur lors de l\'upload du document.');
-    // }
-
-    // public function deleteDocument($id)
-    // {
-    //     $user = Auth::user();
-    //     $document = Document::where('user_id', $user->id)->findOrFail($id);
-
-    //     Storage::delete('public/documents/' . $document->filename);
-    //     $document->delete();
-
-    //     return redirect()->back()->with('success', 'Document supprimé avec succès !');
-    // }
-
-    // public function downloadDocument($id)
-    // {
-    //     $user = Auth::user();
-    //     $document = Document::where('user_id', $user->id)->findOrFail($id);
-
-    //     return Storage::download('public/documents/' . $document->filename, $document->original_name);
-    // }
-
-    // Documents de profil avec vérification des documents requis et pourcentage de complétion
 
     /**
      * Afficher la liste des documents
@@ -1558,6 +1070,22 @@ class ClientController extends Controller
             'formattedSize',
             'fileExists'
         ));
+    }
+
+    /**
+     * Formater la taille du fichier
+     */
+    private function formatFileSize($bytes)
+    {
+        if ($bytes >= 1073741824) {
+            return number_format($bytes / 1073741824, 2) . ' GB';
+        } elseif ($bytes >= 1048576) {
+            return number_format($bytes / 1048576, 2) . ' MB';
+        } elseif ($bytes >= 1024) {
+            return number_format($bytes / 1024, 2) . ' KB';
+        } else {
+            return $bytes . ' bytes';
+        }
     }
 
     /**
@@ -2143,7 +1671,8 @@ class ClientController extends Controller
             'data' => ['ticket_id' => $ticket->id],
         ]);
 
-        return redirect()->route('client.support')->with('success', 'Ticket créé avec succès !');
+        // CORRECTION : route('support.index') au lieu de route('client.support')
+        return redirect()->route('client.support.index')->with('success', 'Ticket créé avec succès !');
     }
 
     public function support(Request $request)
@@ -2254,7 +1783,7 @@ class ClientController extends Controller
         $ticket = SupportTicket::where('user_id', $user->id)->findOrFail($id);
 
         if ($ticket->isClosed()) {
-            return redirect()->back()->with('error', 'Ce ticket est déjà fermé.');
+            return redirect()->route('client.support.show', $id)->with('error', 'Ce ticket est déjà fermé.');
         }
 
         $ticket->markAsClosed();
@@ -2267,7 +1796,8 @@ class ClientController extends Controller
             'data' => ['ticket_id' => $ticket->id],
         ]);
 
-        return redirect()->back()->with('success', 'Ticket fermé avec succès !');
+        // CORRECTION : route explicite au lieu de back()
+        return redirect()->route('client.support.show', $id)->with('success', 'Ticket fermé avec succès !');
     }
 
     public function reopenTicket($id)
@@ -2276,7 +1806,7 @@ class ClientController extends Controller
         $ticket = SupportTicket::where('user_id', $user->id)->findOrFail($id);
 
         if (! $ticket->isClosed() && ! $ticket->isResolved()) {
-            return redirect()->back()->with('error', 'Ce ticket est déjà ouvert.');
+            return redirect()->route('client.support.show', $id)->with('error', 'Ce ticket est déjà ouvert.');
         }
 
         $ticket->reopen();
@@ -2289,7 +1819,8 @@ class ClientController extends Controller
             'data' => ['ticket_id' => $ticket->id],
         ]);
 
-        return redirect()->back()->with('success', 'Ticket rouvert avec succès !');
+        // CORRECTION : route explicite au lieu de back()
+        return redirect()->route('client.support.show', $id)->with('success', 'Ticket rouvert avec succès !');
     }
 
     public function markTicketAsRead($id)
@@ -2417,7 +1948,7 @@ class ClientController extends Controller
         $ticket = SupportTicket::where('user_id', $user->id)->findOrFail($id);
 
         if (! $ticket->isClosed() && ! $ticket->isResolved()) {
-            return redirect()->back()->with('error', 'Vous ne pouvez supprimer que les tickets fermés ou résolus.');
+            return redirect()->route('client.support.show', $id)->with('error', 'Vous ne pouvez supprimer que les tickets fermés ou résolus.');
         }
 
         if ($ticket->metadata && isset($ticket->metadata['attachments'])) {
@@ -2441,7 +1972,8 @@ class ClientController extends Controller
 
         $ticket->delete();
 
-        return redirect()->route('client.support')->with('success', 'Ticket supprimé avec succès !');
+        // CORRECTION : route('support.index') au lieu de route('client.support')
+        return redirect()->route('support.index')->with('success', 'Ticket supprimé avec succès !');
     }
 
     /*
@@ -2568,14 +2100,42 @@ class ClientController extends Controller
         return redirect()->back()->with('success', 'Paramètres mis à jour avec succès !');
     }
 
-    public function logout(Request $request)
-    {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect('/');
+    /**
+ * Déconnexion sécurisée avec redirection intelligente
+ */
+public function logout(Request $request)
+{
+    $user = Auth::user();
+    $isAdmin = false;
+    
+    if ($user) {
+        // Déterminer si c'est un admin AVANT la déconnexion
+        $isAdmin = $user->is_admin || $user->member_type === 'admin';
+        
+        Log::info('Déconnexion utilisateur', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'is_admin' => $isAdmin,
+            'member_type' => $user->member_type,
+            'session_duration' => $request->session()->get('login_time') 
+                ? now()->diffInMinutes($request->session()->get('login_time')) . ' minutes'
+                : 'inconnue',
+        ]);
     }
+
+    Auth::logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+
+    // Redirection différente selon le type d'utilisateur
+    if ($isAdmin) {
+        return redirect()->route('admin.login')
+            ->with('success', 'Vous avez été déconnecté de l\'espace administrateur.');
+    }
+
+    return redirect()->route('login')
+        ->with('success', 'Vous avez été déconnecté avec succès.');
+}
 
     /*
     |--------------------------------------------------------------------------

@@ -2,80 +2,260 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Back Office Admin')</title>
 
     <link rel="icon" href="{{ asset('images/logo.png') }}" type="image/png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}">
     @stack('styles')
 </head>
 <body class="admin-body">
-    <div class="admin-layout">
-        <aside class="admin-sidebar">
-            <div class="admin-brand">
-                <img src="{{ asset('images/logo.png') }}" alt="BHDM" />
-                <div>
-                    <strong>BHDM Admin</strong>
-                    <span>Back-office</span>
+    <!-- Overlay pour mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="admin-layout" id="adminLayout">
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="sidebar-header">
+                <div class="admin-brand">
+                    <div class="brand-icon">
+                        <img src="{{ asset('images/logo.png') }}" alt="BHDM" />
+                    </div>
+                    <div class="brand-text">
+                        <strong>BHDM Admin</strong>
+                        <span>Back-office</span>
+                    </div>
                 </div>
+                <button class="sidebar-close" id="sidebarClose">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <nav class="admin-nav">
-                <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
-                    <i class="fa-solid fa-chart-line"></i> Tableau de bord
-                </a>
-                <a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-users"></i> Utilisateurs
-                </a>
-                <a href="{{ route('admin.transactions.index') }}" class="{{ request()->routeIs('admin.transactions.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-money-bill-wave"></i> Transactions
-                </a>
-                <a href="{{ route('admin.funding.pending-validation') }}" class="{{ request()->routeIs('admin.funding.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-file-signature"></i> Financement
-                </a>
-                <a href="{{ route('admin.documents.index') }}" class="{{ request()->routeIs('admin.documents.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-folder-open"></i> Documents
-                </a>
-                <a href="{{ route('admin.trainings.index') }}" class="{{ request()->routeIs('admin.trainings.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-graduation-cap"></i> Formations
-                </a>
-                <a href="{{ route('admin.support.index') }}" class="{{ request()->routeIs('admin.support.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-headset"></i> Support
-                </a>
-                <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-chart-pie"></i> Rapports
-                </a>
-                <a href="{{ route('admin.settings.index') }}" class="{{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-gear"></i> Paramètres
-                </a>
+                <div class="nav-section">
+                    <span class="nav-label">Principal</span>
+                    <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Tableau de bord</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-label">Gestion</span>
+                    <a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-users"></i>
+                        <span>Utilisateurs</span>
+                    </a>
+                    <a href="{{ route('admin.transactions.index') }}" class="{{ request()->routeIs('admin.transactions.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-money-bill-wave"></i>
+                        <span>Transactions</span>
+                    </a>
+                    <a href="{{ route('admin.funding.pending-validation') }}" class="{{ request()->routeIs('admin.funding.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-file-signature"></i>
+                        <span>Financement</span>
+                        <span class="badge">3</span>
+                    </a>
+                    <a href="{{ route('admin.documents.index') }}" class="{{ request()->routeIs('admin.documents.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-folder-open"></i>
+                        <span>Documents</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-label">Services</span>
+                    <a href="{{ route('admin.trainings.index') }}" class="{{ request()->routeIs('admin.trainings.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                        <span>Formations</span>
+                    </a>
+                    <a href="{{ route('admin.support.index') }}" class="{{ request()->routeIs('admin.support.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-headset"></i>
+                        <span>Support</span>
+                        <span class="badge bg-danger">Nouveau</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-label">Système</span>
+                    <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>Rapports</span>
+                    </a>
+                    <a href="{{ route('admin.settings.index') }}" class="{{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>Paramètres</span>
+                    </a>
+                </div>
             </nav>
+
+            <div class="admin-sidebar-footer">
+                <div class="user-preview">
+                    <div class="user-avatar">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-name">{{ Auth::guard('admin')->user()->name ?? 'Admin' }}</span>
+                        <span class="user-role">Super Administrateur</span>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <div class="admin-main">
             <header class="admin-topbar">
-                <div>
-                    <h1>@yield('page-title', 'Administration')</h1>
-                    <p>@yield('page-subtitle', 'Gestion globale de la plateforme')</p>
-                </div>
-                <form method="POST" action="{{ route('admin.logout') }}">
-                    @csrf
-                    <button type="submit" class="btn btn-outline-light btn-sm">
-                        <i class="fa-solid fa-right-from-bracket"></i> Déconnexion
+                <div class="topbar-left">
+                    <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Toggle sidebar">
+                        <i class="fa-solid fa-bars"></i>
                     </button>
-                </form>
+                    <div class="breadcrumb">
+                        <span>BHDM</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                        <span>@yield('page-title', 'Administration')</span>
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    <div class="topbar-actions">
+                        <button class="action-btn" type="button" title="Rechercher" onclick="toggleSearch()">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </button>
+                        <button class="action-btn has-notification" type="button" title="Notifications" onclick="toggleNotifications()">
+                            <i class="fa-solid fa-bell"></i>
+                            <span class="notification-dot"></span>
+                        </button>
+                        <button class="action-btn" type="button" title="Messages" onclick="toggleMessages()">
+                            <i class="fa-solid fa-envelope"></i>
+                        </button>
+                    </div>
+
+                    <form method="POST" action="{{ route('admin.logout') }}" class="logout-form">
+                        @csrf
+                        <button type="submit" class="btn-logout">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                            <span>Déconnexion</span>
+                        </button>
+                    </form>
+                </div>
             </header>
 
             <main class="admin-content">
                 @include('admin.partials.flash')
                 @yield('content')
             </main>
+
+            <footer class="admin-footer">
+                <span>&copy; {{ date('Y') }} BHDM. Tous droits réservés.</span>
+                <span>Version 2.0.1</span>
+            </footer>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Gestion du menu mobile
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const sidebarClose = document.getElementById('sidebarClose');
+            const adminSidebar = document.getElementById('adminSidebar');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+            const adminLayout = document.getElementById('adminLayout');
+
+            // Ouvrir le menu
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    adminSidebar.classList.add('active');
+                    sidebarOverlay.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                });
+            }
+
+            // Fermer le menu
+            if (sidebarClose) {
+                sidebarClose.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeSidebar();
+                });
+            }
+
+            // Fermer en cliquant sur l'overlay
+            if (sidebarOverlay) {
+                sidebarOverlay.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    closeSidebar();
+                });
+            }
+
+            // Fermer en cliquant sur un lien (mobile)
+            const navLinks = document.querySelectorAll('.admin-nav a');
+            navLinks.forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 1024) {
+                        closeSidebar();
+                    }
+                });
+            });
+
+            // Fermer avec la touche Escape
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeSidebar();
+                }
+            });
+
+            function closeSidebar() {
+                adminSidebar.classList.remove('active');
+                sidebarOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+
+            // Toggle sidebar desktop (collapse)
+            let isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+
+            if (isCollapsed && window.innerWidth > 1024) {
+                adminLayout.classList.add('sidebar-collapsed');
+            }
+
+            // Double clic sur le toggle pour collapse desktop
+            sidebarToggle.addEventListener('dblclick', function(e) {
+                if (window.innerWidth > 1024) {
+                    e.preventDefault();
+                    adminLayout.classList.toggle('sidebar-collapsed');
+                    localStorage.setItem('sidebarCollapsed', adminLayout.classList.contains('sidebar-collapsed'));
+                }
+            });
+        });
+
+        // Fonctions pour les boutons d'action
+        function toggleSearch() {
+            alert('Fonction de recherche à implémenter');
+        }
+
+        function toggleNotifications() {
+            alert('Fonction de notifications à implémenter');
+        }
+
+        function toggleMessages() {
+            alert('Fonction de messages à implémenter');
+        }
+
+        // Gestion du touch sur mobile
+        document.addEventListener('touchstart', function() {}, {passive: true});
+
+        // Empêcher le zoom sur double tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(e) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    </script>
     @stack('scripts')
 </body>
 </html>

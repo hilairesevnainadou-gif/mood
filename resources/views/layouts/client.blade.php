@@ -4,7 +4,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    
+    <!-- CSRF Token - CRITIQUE -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!-- Anti-cache headers pour pages protégées -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 
     <!-- PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -57,7 +64,61 @@
 
     <title>@yield('title', 'BHDM Client')</title>
     @stack('styles')
-    @yield('styles')
+
+    <!-- Styles pour la photo de profil -->
+    <style>
+        .profile-photo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .profile-avatar-container {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.3);
+            flex-shrink: 0;
+        }
+
+        .user-avatar-large .profile-avatar-container {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(255,255,255,0.4);
+        }
+
+        .bottom-nav-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .nav-item.active .bottom-nav-avatar {
+            border-color: var(--primary-500, #1b5a8d);
+            box-shadow: 0 0 0 2px rgba(27, 90, 141, 0.2);
+        }
+
+        .avatar-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .user-avatar-large .avatar-placeholder {
+            font-size: 1.5rem;
+        }
+    </style>
 </head>
 
 <body class="client-body">
@@ -66,6 +127,7 @@
         $hasUploadedRequiredDocuments = $user?->hasUploadedRequiredDocuments() ?? false;
         $hasValidatedRequiredDocuments = $user?->hasAllRequiredDocuments() ?? false;
     @endphp
+
     <!-- Preloader Professionnel -->
     <div class="app-preloader" id="appPreloader">
         <div class="preloader-content">
@@ -149,22 +211,32 @@
                             }
                         @endphp
 
-                       <button class="action-btn notifications-btn" id="notificationsTrigger" aria-label="Notifications">
-    <i class="fas fa-bell"></i>
-    <span id="notificationBadge" class="badge-count {{ $unreadCount > 0 ? '' : 'd-none' }}">
-        {{ $unreadCount > 9 ? '9+' : $unreadCount }}
-    </span>
-</button>
+                        <button class="action-btn notifications-btn" id="notificationsTrigger" aria-label="Notifications">
+                            <i class="fas fa-bell"></i>
+                            <span id="notificationBadge" class="badge-count {{ $unreadCount > 0 ? '' : 'd-none' }}">
+                                {{ $unreadCount > 9 ? '9+' : $unreadCount }}
+                            </span>
+                        </button>
                     </div>
 
                     <!-- User Profile -->
                     <div class="user-profile">
                         <div class="profile-dropdown" id="profileDropdown">
                             <div class="profile-avatar" tabindex="0" aria-label="Menu profil utilisateur">
-                                <div class="avatar-img"
-                                    style="background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};"
-                                    aria-hidden="true">
-                                    {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
+                                <div class="profile-avatar-container" aria-hidden="true">
+                                    @if($user && $user->profile_photo_url)
+                                        <img src="{{ $user->profile_photo_url }}?v={{ time() }}"
+                                             alt="Photo de profil"
+                                             class="profile-photo-img"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="avatar-placeholder" style="display: none; background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};">
+                                            {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
+                                        </div>
+                                    @else
+                                        <div class="avatar-placeholder" style="background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};">
+                                            {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
+                                        </div>
+                                    @endif
                                 </div>
                                 <div class="profile-info">
                                     <span class="profile-name">{{ Auth::user()->name ?? 'Utilisateur' }}</span>
@@ -262,10 +334,20 @@
                 <div class="sidebar-header">
                     <div class="sidebar-user">
                         <div class="user-avatar-large">
-                            <div class="avatar-img"
-                                style="background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};"
-                                aria-hidden="true">
-                                {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
+                            <div class="profile-avatar-container" aria-hidden="true">
+                                @if($user && $user->profile_photo_url)
+                                    <img src="{{ $user->profile_photo_url }}?v={{ time() }}"
+                                         alt="Photo de profil"
+                                         class="profile-photo-img"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div class="avatar-placeholder" style="display: none; background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};">
+                                        {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
+                                    </div>
+                                @else
+                                    <div class="avatar-placeholder" style="background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};">
+                                        {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
+                                    </div>
+                                @endif
                             </div>
                             <div class="user-details">
                                 <h4>{{ Auth::user()->name ?? 'Utilisateur' }}</h4>
@@ -299,8 +381,8 @@
                                 </li>
                             @endif
                             @if ($hasValidatedRequiredDocuments)
-                                <li class="menu-item {{ Request::is('client/portefeuille*') ? 'active' : '' }}">
-                                    <a href="{{ route('client.wallet') }}" class="menu-link page-transition"
+                                <li class="menu-item {{ Request::is('client/wallet*') ? 'active' : '' }}">
+                                    <a href="{{ route('client.wallet.index') }}" class="menu-link page-transition"
                                         role="menuitem">
                                         <span class="menu-icon" aria-hidden="true">
                                             <i class="fas fa-wallet"></i>
@@ -308,7 +390,7 @@
                                         <span class="menu-text">Mon Portefeuille</span>
                                     </a>
                                 </li>
-                                <li class="menu-item {{ Request::is('client/demandes*') ? 'active' : '' }}">
+                                <li class="menu-item {{ Request::is('client/requests*') ? 'active' : '' }}">
                                     <a href="{{ route('client.requests.index') }}" class="menu-link page-transition"
                                         role="menuitem">
                                         <span class="menu-icon" aria-hidden="true">
@@ -335,7 +417,7 @@
                                 </a>
                             </li>
                             @if ($hasValidatedRequiredDocuments)
-                                <li class="menu-item {{ Request::is('client/formations*') ? 'active' : '' }}">
+                                <li class="menu-item {{ Request::is('client/training*') ? 'active' : '' }}">
                                     <a href="{{ route('client.trainings') }}" class="menu-link page-transition"
                                         role="menuitem">
                                         <span class="menu-icon" aria-hidden="true">
@@ -353,7 +435,7 @@
                         <h6 class="section-title">Support & Paramètres</h6>
                         <ul class="menu-list" role="menu">
                             <li class="menu-item {{ Request::is('client/notifications*') ? 'active' : '' }}">
-                                <a href="{{ route('client.notifications') }}" class="menu-link page-transition"
+                                <a href="{{ route('client.notifications.index') }}" class="menu-link page-transition"
                                     role="menuitem">
                                     <span class="menu-icon" aria-hidden="true">
                                         <i class="fas fa-bell"></i>
@@ -362,7 +444,7 @@
                                 </a>
                             </li>
                             <li class="menu-item {{ Request::is('client/support*') ? 'active' : '' }}">
-                                <a href="{{ route('client.support') }}" class="menu-link page-transition"
+                                <a href="{{ route('client.support.index') }}" class="menu-link page-transition"
                                     role="menuitem">
                                     <span class="menu-icon" aria-hidden="true">
                                         <i class="fas fa-headset"></i>
@@ -370,7 +452,7 @@
                                     <span class="menu-text">Support Client</span>
                                 </a>
                             </li>
-                            <li class="menu-item {{ Request::is('client/parametres*') ? 'active' : '' }}">
+                            <li class="menu-item {{ Request::is('client/settings*') ? 'active' : '' }}">
                                 <a href="{{ route('client.settings') }}" class="menu-link page-transition"
                                     role="menuitem">
                                     <span class="menu-icon" aria-hidden="true">
@@ -430,14 +512,14 @@
                 </a>
             @endif
             @if ($hasValidatedRequiredDocuments)
-                <a href="{{ route('client.wallet') }}"
-                    class="nav-item page-transition {{ Request::is('client/portefeuille*') ? 'active' : '' }}"
+                <a href="{{ route('client.wallet.index') }}"
+                    class="nav-item page-transition {{ Request::is('client/wallet*') ? 'active' : '' }}"
                     aria-label="Portefeuille">
                     <i class="fas fa-wallet" aria-hidden="true"></i>
                     <span>Portefeuille</span>
                 </a>
                 <a href="{{ route('client.requests.index') }}"
-                    class="nav-item page-transition {{ Request::is('client/demandes*') ? 'active' : '' }}"
+                    class="nav-item page-transition {{ Request::is('client/requests*') ? 'active' : '' }}"
                     aria-label="Demandes">
                     <i class="fas fa-file-alt" aria-hidden="true"></i>
                     <span>Demandes</span>
@@ -446,7 +528,14 @@
             <a href="{{ route('client.profile') }}"
                 class="nav-item page-transition {{ Request::is('client/profile*') ? 'active' : '' }}"
                 aria-label="Profil">
-                <i class="fas fa-user" aria-hidden="true"></i>
+                @if($user && $user->profile_photo_url)
+                    <img src="{{ $user->profile_photo_url }}?v={{ time() }}"
+                         alt="Profil"
+                         class="bottom-nav-avatar"
+                         onerror="this.style.display='none'; this.parentNode.innerHTML='<i class=\'fas fa-user\' aria-hidden=\'true\'></i><span>Profil</span>';">
+                @else
+                    <i class="fas fa-user" aria-hidden="true"></i>
+                @endif
                 <span>Profil</span>
             </a>
         </nav>
@@ -468,7 +557,7 @@
                 </div>
             </div>
             <div class="panel-footer">
-                <a href="{{ route('client.notifications') }}" class="view-all page-transition">
+                <a href="{{ route('client.notifications.index') }}" class="view-all page-transition">
                     Voir toutes les notifications
                     <i class="fas fa-arrow-right" aria-hidden="true"></i>
                 </a>
@@ -501,8 +590,8 @@
         </div>
     </div>
 
-    <!-- Logout Form -->
-    <form id="logout-form" action="{{ route('client.logout') }}" method="POST" style="display: none;">
+    <!-- Logout Form - CORRIGÉ: utilise route('logout') et non route('client.logout') -->
+    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
         @csrf
     </form>
 
@@ -520,8 +609,7 @@
             const preloader = document.getElementById('appPreloader');
             const appContainer = document.getElementById('appContainer');
 
-            // Simuler un chargement minimal pour une meilleure UX
-            const minLoadTime = 800; // 0.8 secondes minimum
+            const minLoadTime = 800;
 
             setTimeout(() => {
                 preloader.style.opacity = '0';
@@ -541,6 +629,51 @@
             initOnlineStatus();
             initPageTransitions();
             initEventListeners();
+            initSessionKeepAlive(); // NOUVEAU: Garde la session active
+        }
+    </script>
+
+    <!-- Session Keep Alive - NOUVEAU -->
+    <script>
+        function initSessionKeepAlive() {
+            // Ping toutes les 5 minutes pour garder la session active
+            setInterval(async () => {
+                try {
+                    const response = await fetch('/api/session-check', {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        credentials: 'same-origin'
+                    });
+                    
+                    if (!response.ok) {
+                        console.warn('Session check failed');
+                    }
+                } catch (error) {
+                    console.error('Keep-alive error:', error);
+                }
+            }, 300000); // 5 minutes
+            
+            // Rafraîchir le token CSRF avant les requêtes importantes
+            window.refreshCsrfToken = async function() {
+                try {
+                    const response = await fetch('/api/session-check', {
+                        credentials: 'same-origin'
+                    });
+                    const data = await response.json();
+                    if (data.csrf_token) {
+                        document.querySelector('meta[name="csrf-token"]').content = data.csrf_token;
+                        // Mettre à jour aussi les inputs hidden des formulaires
+                        document.querySelectorAll('input[name="_token"]').forEach(input => {
+                            input.value = data.csrf_token;
+                        });
+                    }
+                } catch (error) {
+                    console.error('CSRF refresh error:', error);
+                }
+            };
         }
     </script>
 
@@ -577,13 +710,13 @@
             show(options) {
                 const {
                     title = '',
-                        message = '',
-                        type = 'info',
-                        duration = 5000,
-                        icon = null,
-                        position = 'top-right',
-                        actions = [],
-                        dismissible = true
+                    message = '',
+                    type = 'info',
+                    duration = 5000,
+                    icon = null,
+                    position = 'top-right',
+                    actions = [],
+                    dismissible = true
                 } = options;
 
                 const toastId = `toast-${++this.toastId}`;
@@ -726,84 +859,83 @@
 
         let toastSystem;
     </script>
-<script>
-// Système de gestion du badge de notifications
-const NotificationBadge = {
-    badgeElement: document.getElementById('notificationBadge'),
 
-    update: async function() {
-        try {
-            const response = await fetch('{{ route('client.notifications.list') }}', {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+    <!-- Notification Badge System -->
+    <script>
+        const NotificationBadge = {
+            badgeElement: document.getElementById('notificationBadge'),
+
+            update: async function() {
+                try {
+                    const response = await fetch('{{ route('client.notifications.list') }}', {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success && data.notifications) {
+                        const unreadCount = data.notifications.filter(n => !n.read_at).length;
+                        this.render(unreadCount);
+                    }
+                } catch (error) {
+                    console.error('Erreur mise à jour badge:', error);
                 }
-            });
+            },
 
-            const data = await response.json();
+            render: function(count) {
+                if (!this.badgeElement) return;
 
-            if (data.success && data.notifications) {
-                const unreadCount = data.notifications.filter(n => !n.read_at).length;
-                this.render(unreadCount);
+                if (count > 0) {
+                    this.badgeElement.textContent = count > 9 ? '9+' : count;
+                    this.badgeElement.classList.remove('d-none');
+                    this.badgeElement.style.transform = 'scale(1.2)';
+                    setTimeout(() => {
+                        this.badgeElement.style.transform = 'scale(1)';
+                    }, 200);
+                } else {
+                    this.badgeElement.classList.add('d-none');
+                }
+            },
+
+            decrement: function() {
+                const currentText = this.badgeElement.textContent;
+                let current = currentText === '9+' ? 10 : parseInt(currentText) || 0;
+                if (current > 0) {
+                    this.render(current - 1);
+                }
+            },
+
+            clear: function() {
+                this.render(0);
             }
-        } catch (error) {
-            console.error('Erreur mise à jour badge:', error);
+        };
+
+        setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                NotificationBadge.update();
+            }
+        }, 30000);
+
+        const notificationsTrigger = document.getElementById('notificationsTrigger');
+        if (notificationsTrigger) {
+            notificationsTrigger.addEventListener('click', () => {
+                NotificationBadge.update();
+            });
         }
-    },
 
-    render: function(count) {
-        if (!this.badgeElement) return;
+        document.addEventListener('notificationRead', () => {
+            NotificationBadge.decrement();
+        });
 
-        if (count > 0) {
-            this.badgeElement.textContent = count > 9 ? '9+' : count;
-            this.badgeElement.classList.remove('d-none');
-            // Animation subtile
-            this.badgeElement.style.transform = 'scale(1.2)';
-            setTimeout(() => {
-                this.badgeElement.style.transform = 'scale(1)';
-            }, 200);
-        } else {
-            this.badgeElement.classList.add('d-none');
-        }
-    },
+        document.addEventListener('allNotificationsRead', () => {
+            NotificationBadge.clear();
+        });
+    </script>
 
-    decrement: function() {
-        const currentText = this.badgeElement.textContent;
-        let current = currentText === '9+' ? 10 : parseInt(currentText) || 0;
-        if (current > 0) {
-            this.render(current - 1);
-        }
-    },
-
-    clear: function() {
-        this.render(0);
-    }
-};
-
-// Mettre à jour le badge toutes les 30 secondes
-setInterval(() => {
-    if (document.visibilityState === 'visible') {
-        NotificationBadge.update();
-    }
-}, 30000);
-
-// Mettre à jour quand on ouvre le panel
-const notificationsTrigger = document.getElementById('notificationsTrigger');
-if (notificationsTrigger) {
-    notificationsTrigger.addEventListener('click', () => {
-        NotificationBadge.update();
-    });
-}
-
-// Écouter les événements personnalisés pour mise à jour immédiate
-document.addEventListener('notificationRead', () => {
-    NotificationBadge.decrement();
-});
-
-document.addEventListener('allNotificationsRead', () => {
-    NotificationBadge.clear();
-});
-</script>
     <!-- Navigation System -->
     <script>
         function initNavigation() {
@@ -866,7 +998,6 @@ document.addEventListener('allNotificationsRead', () => {
                 }
             });
 
-            // Profile dropdown
             const profileDropdown = document.getElementById('profileDropdown');
             if (profileDropdown) {
                 const profileAvatar = profileDropdown.querySelector('.profile-avatar');
@@ -896,7 +1027,6 @@ document.addEventListener('allNotificationsRead', () => {
                 });
             }
 
-            // Search functionality
             const searchTrigger = document.getElementById('searchTrigger');
             const searchClose = document.getElementById('searchClose');
             const searchClear = document.getElementById('searchClear');
@@ -953,14 +1083,6 @@ document.addEventListener('allNotificationsRead', () => {
                 }
             });
 
-            // Keyboard navigation pour la sidebar
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && sidebar.classList.contains('open')) {
-                    closeSidebar();
-                }
-            });
-
-            // Focus trap pour la sidebar
             function trapFocus(element) {
                 const focusableElements = element.querySelectorAll(
                     'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -998,7 +1120,6 @@ document.addEventListener('allNotificationsRead', () => {
             const sidebarStatusDot = document.getElementById('sidebarStatusDot');
             const sidebarStatusText = document.getElementById('sidebarStatusText');
 
-            // Variables pour le suivi du temps hors ligne
             let offlineStartTime = null;
             let offlineNotificationShown = false;
             let checkInterval = null;
@@ -1007,7 +1128,6 @@ document.addEventListener('allNotificationsRead', () => {
                 const isOnline = navigator.onLine;
                 const currentTime = Date.now();
 
-                // Mettre à jour le statut dans le header
                 if (appStatus) {
                     const indicator = appStatus.querySelector('.status-indicator');
                     const text = appStatus.querySelector('.status-text');
@@ -1018,11 +1138,9 @@ document.addEventListener('allNotificationsRead', () => {
                         text.textContent = 'En ligne';
                         text.className = 'status-text online';
 
-                        // Réinitialiser les variables quand on est en ligne
                         offlineStartTime = null;
                         offlineNotificationShown = false;
 
-                        // Arrêter la vérification périodique
                         if (checkInterval) {
                             clearInterval(checkInterval);
                             checkInterval = null;
@@ -1034,18 +1152,14 @@ document.addEventListener('allNotificationsRead', () => {
                         text.textContent = 'Hors ligne';
                         text.className = 'status-text offline';
 
-                        // Enregistrer le moment où on est passé hors ligne
                         if (!offlineStartTime) {
                             offlineStartTime = currentTime;
                             offlineNotificationShown = false;
-
-                            // Démarrer la vérification périodique pour 1 heure
                             startOfflineCheck();
                         }
                     }
                 }
 
-                // Mettre à jour le statut dans la sidebar
                 if (sidebarStatusDot && sidebarStatusText) {
                     if (isOnline) {
                         sidebarStatusDot.className = 'status-dot online';
@@ -1056,49 +1170,35 @@ document.addEventListener('allNotificationsRead', () => {
                     }
                 }
 
-                // Mettre à jour l'attribut du document
                 document.documentElement.dataset.online = isOnline;
             }
 
             function startOfflineCheck() {
-                // Vérifier toutes les minutes
                 checkInterval = setInterval(() => {
                     if (!navigator.onLine && offlineStartTime && !offlineNotificationShown) {
                         const currentTime = Date.now();
                         const timeOffline = currentTime - offlineStartTime;
-                        const oneHour = 60 * 60 * 1000; // 1 heure en millisecondes
+                        const oneHour = 60 * 60 * 1000;
 
-                        // Vérifier si 1 heure s'est écoulée
                         if (timeOffline >= oneHour) {
-                            // Afficher la notification après 1 heure
                             if (toastSystem) {
                                 toastSystem.warning(
                                     'Connexion perdue depuis 1 heure',
                                     'Vous êtes hors ligne depuis plus d\'une heure. Veuillez vérifier votre connexion internet.', {
-                                        duration: 10000, // 10 secondes
+                                        duration: 10000,
                                         showCloseButton: true
                                     }
                                 );
                             }
 
-                            // Marquer que la notification a été affichée
                             offlineNotificationShown = true;
-
-                            // Arrêter la vérification
                             clearInterval(checkInterval);
                             checkInterval = null;
-                        } else {
-                            // Calculer le temps restant
-                            const timeLeft = oneHour - timeOffline;
-                            const minutesLeft = Math.ceil(timeLeft / (60 * 1000));
-
-                            console.log(`Notification dans ${minutesLeft} minute(s)`);
                         }
                     }
-                }, 60000); // Vérifier toutes les minutes
+                }, 60000);
             }
 
-            // Fonction pour afficher la notification de reconnexion (immédiatement)
             function showReconnectionNotification() {
                 if (toastSystem && navigator.onLine) {
                     toastSystem.success(
@@ -1111,151 +1211,8 @@ document.addEventListener('allNotificationsRead', () => {
                 }
             }
 
-            // Mise à jour initiale
             updateOnlineStatus();
 
-            // Écouter les changements d'état
-            window.addEventListener('online', function() {
-                updateOnlineStatus();
-                showReconnectionNotification();
-            });
-
-            window.addEventListener('offline', function() {
-                updateOnlineStatus();
-                // Ne pas afficher immédiatement le message hors ligne
-                // La notification ne s'affichera qu'après 1 heure
-            });
-
-            // Vérifier périodiquement la connexion (toutes les 30 secondes)
-            setInterval(() => {
-                const wasOnline = document.documentElement.dataset.online === 'true';
-                updateOnlineStatus();
-
-                // Si l'état a changé de hors ligne à en ligne, afficher la notification
-                if (!wasOnline && navigator.onLine) {
-                    showReconnectionNotification();
-                }
-            }, 30000);
-        }
-
-        // Version alternative avec localStorage pour persister l'état entre les rafraîchissements
-        // LIGNE 1492 - Remplacez toute la fonction par :
-        function initOnlineStatusSystem() {
-            const appStatus = document.getElementById('appStatus');
-            const sidebarStatusDot = document.getElementById('sidebarStatusDot');
-            const sidebarStatusText = document.getElementById('sidebarStatusText');
-
-            // Variables pour le suivi du temps hors ligne
-            let offlineStartTime = null;
-            let offlineNotificationShown = false;
-            let checkInterval = null;
-
-            function updateOnlineStatus() {
-                const isOnline = navigator.onLine;
-                const currentTime = Date.now();
-
-                // Mettre à jour le statut dans le header
-                if (appStatus) {
-                    const indicator = appStatus.querySelector('.status-indicator');
-                    const text = appStatus.querySelector('.status-text');
-
-                    if (isOnline) {
-                        indicator.className = 'status-indicator online';
-                        indicator.setAttribute('aria-label', 'En ligne');
-                        text.textContent = 'En ligne';
-                        text.className = 'status-text online';
-
-                        // Réinitialiser les variables quand on est en ligne
-                        offlineStartTime = null;
-                        offlineNotificationShown = false;
-
-                        // Arrêter la vérification périodique
-                        if (checkInterval) {
-                            clearInterval(checkInterval);
-                            checkInterval = null;
-                        }
-
-                    } else {
-                        indicator.className = 'status-indicator offline';
-                        indicator.setAttribute('aria-label', 'Hors ligne');
-                        text.textContent = 'Hors ligne';
-                        text.className = 'status-text offline';
-
-                        // Enregistrer le moment où on est passé hors ligne
-                        if (!offlineStartTime) {
-                            offlineStartTime = currentTime;
-                            offlineNotificationShown = false;
-
-                            // Démarrer la vérification périodique pour 1 heure
-                            startOfflineCheck();
-                        }
-                    }
-                }
-
-                // Mettre à jour le statut dans la sidebar
-                if (sidebarStatusDot && sidebarStatusText) {
-                    if (isOnline) {
-                        sidebarStatusDot.className = 'status-dot online';
-                        sidebarStatusText.textContent = 'Connecté';
-                    } else {
-                        sidebarStatusDot.className = 'status-dot offline';
-                        sidebarStatusText.textContent = 'Déconnecté';
-                    }
-                }
-
-                // Mettre à jour l'attribut du document
-                document.documentElement.dataset.online = isOnline;
-            }
-
-            function startOfflineCheck() {
-                // Vérifier toutes les minutes
-                checkInterval = setInterval(() => {
-                    if (!navigator.onLine && offlineStartTime && !offlineNotificationShown) {
-                        const currentTime = Date.now();
-                        const timeOffline = currentTime - offlineStartTime;
-                        const oneHour = 60 * 60 * 1000; // 1 heure en millisecondes
-
-                        // Vérifier si 1 heure s'est écoulée
-                        if (timeOffline >= oneHour) {
-                            // Afficher la notification après 1 heure
-                            if (window.toast) {
-                                window.toast.warning(
-                                    'Connexion perdue depuis 1 heure',
-                                    'Vous êtes hors ligne depuis plus d\'une heure. Veuillez vérifier votre connexion internet.', {
-                                        duration: 10000, // 10 secondes
-                                        showCloseButton: true
-                                    }
-                                );
-                            }
-
-                            // Marquer que la notification a été affichée
-                            offlineNotificationShown = true;
-
-                            // Arrêter la vérification
-                            clearInterval(checkInterval);
-                            checkInterval = null;
-                        }
-                    }
-                }, 60000); // Vérifier toutes les minutes
-            }
-
-            // Fonction pour afficher la notification de reconnexion
-            function showReconnectionNotification() {
-                if (window.toast && navigator.onLine) {
-                    window.toast.success(
-                        'Connexion rétablie',
-                        'Votre connexion internet a été rétablie avec succès.', {
-                            duration: 5000,
-                            showCloseButton: true
-                        }
-                    );
-                }
-            }
-
-            // Mise à jour initiale
-            updateOnlineStatus();
-
-            // Écouter les changements d'état
             window.addEventListener('online', function() {
                 updateOnlineStatus();
                 showReconnectionNotification();
@@ -1265,43 +1222,14 @@ document.addEventListener('allNotificationsRead', () => {
                 updateOnlineStatus();
             });
 
-            // Vérifier périodiquement la connexion (toutes les 30 secondes)
             setInterval(() => {
                 const wasOnline = document.documentElement.dataset.online === 'true';
                 updateOnlineStatus();
 
-                // Si l'état a changé de hors ligne à en ligne, afficher la notification
                 if (!wasOnline && navigator.onLine) {
                     showReconnectionNotification();
                 }
             }, 30000);
-        }
-
-
-
-        // Démarrer le système quand le DOM est chargé
-        // Remplacez l'appel par :
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialiser les composants
-            if (typeof initOnlineStatusSystem === 'function') {
-                initOnlineStatusSystem();
-            } else if (typeof initOnlineStatus === 'function') {
-                initOnlineStatus();
-            } else if (typeof initOnlineStatusWithPersistence === 'function') {
-                initOnlineStatusWithPersistence();
-            }
-        });
-        // Fonction pour réinitialiser manuellement le compteur hors ligne
-        function resetOfflineTimer() {
-            localStorage.removeItem('offlineStartTime');
-            localStorage.removeItem('offlineNotificationShown');
-
-            if (checkInterval) {
-                clearInterval(checkInterval);
-                checkInterval = null;
-            }
-
-            console.log('Compteur hors ligne réinitialisé');
         }
     </script>
 
@@ -1353,105 +1281,104 @@ document.addEventListener('allNotificationsRead', () => {
                 }
             });
 
-           async function loadNotifications() {
-    const notificationsList = document.getElementById('notificationsList');
-    if (!notificationsList) return;
+            async function loadNotifications() {
+                const notificationsList = document.getElementById('notificationsList');
+                if (!notificationsList) return;
 
-    notificationsList.innerHTML = `
-        <div class="loading-notifications">
-            <div class="spinner" aria-hidden="true"></div>
-            <p>Chargement...</p>
-        </div>
-    `;
-
-    try {
-        const response = await fetch('{{ route('client.notifications.list') }}', {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-            }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            const unreadCount = data.notifications.filter(n => !n.read_at).length;
-
-            // Mettre à jour le badge immédiatement
-            if (window.NotificationBadge) {
-                window.NotificationBadge.render(unreadCount);
-            }
-
-            if (data.notifications.length > 0) {
-                notificationsList.innerHTML = data.notifications.map(notification => `
-                    <div class="notification-item ${notification.read_at ? '' : 'unread'}"
-                         data-id="${notification.id}"
-                         onclick="markNotificationRead(${notification.id}, this)">
-                        <div class="notification-icon" style="background: ${notification.color || '#3b82f6'}">
-                            <i class="${notification.icon || 'fas fa-bell'}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <p class="notification-text">${notification.message}</p>
-                            <span class="notification-time">${notification.time}</span>
-                        </div>
-                        ${!notification.read_at ? '<div class="unread-dot"></div>' : ''}
-                    </div>
-                `).join('');
-            } else {
                 notificationsList.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>Aucune notification</p>
+                    <div class="loading-notifications">
+                        <div class="spinner" aria-hidden="true"></div>
+                        <p>Chargement...</p>
                     </div>
                 `;
-            }
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        notificationsList.innerHTML = `
-            <div class="error-state">
-                <i class="fas fa-exclamation-triangle"></i>
-                <p>Erreur de chargement</p>
-            </div>
-        `;
-    }
-}
 
-// Fonction pour marquer une notification comme lue via AJAX
-async function markNotificationRead(id, element) {
-    if (element.classList.contains('unread')) {
-        try {
-            const response = await fetch(`/client/notifications/${id}/lire`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Content-Type': 'application/json'
+                try {
+                    const response = await fetch('{{ route('client.notifications.list') }}', {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        const unreadCount = data.notifications.filter(n => !n.read_at).length;
+
+                        if (window.NotificationBadge) {
+                            window.NotificationBadge.render(unreadCount);
+                        }
+
+                        if (data.notifications.length > 0) {
+                            notificationsList.innerHTML = data.notifications.map(notification => `
+                                <div class="notification-item ${notification.read_at ? '' : 'unread'}"
+                                     data-id="${notification.id}"
+                                     onclick="markNotificationRead(${notification.id}, this)">
+                                    <div class="notification-icon" style="background: ${notification.color || '#3b82f6'}">
+                                        <i class="${notification.icon || 'fas fa-bell'}"></i>
+                                    </div>
+                                    <div class="notification-content">
+                                        <p class="notification-text">${notification.message}</p>
+                                        <span class="notification-time">${notification.time}</span>
+                                    </div>
+                                    ${!notification.read_at ? '<div class="unread-dot"></div>' : ''}
+                                </div>
+                            `).join('');
+                        } else {
+                            notificationsList.innerHTML = `
+                                <div class="empty-state">
+                                    <i class="fas fa-bell-slash"></i>
+                                    <p>Aucune notification</p>
+                                </div>
+                            `;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    notificationsList.innerHTML = `
+                        <div class="error-state">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Erreur de chargement</p>
+                        </div>
+                    `;
                 }
-            });
-
-            if (response.ok) {
-                element.classList.remove('unread');
-                const dot = element.querySelector('.unread-dot');
-                if (dot) dot.remove();
-
-                // Déclencher l'événement pour mettre à jour le badge
-                document.dispatchEvent(new Event('notificationRead'));
             }
-        } catch (error) {
-            console.error('Erreur:', error);
-        }
-    }
-}
+
+            window.markNotificationRead = async function(id, element) {
+                if (element.classList.contains('unread')) {
+                    try {
+                        const response = await fetch(`/client/notifications/${id}/read`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Content-Type': 'application/json'
+                            },
+                            credentials: 'same-origin'
+                        });
+
+                        if (response.ok) {
+                            element.classList.remove('unread');
+                            const dot = element.querySelector('.unread-dot');
+                            if (dot) dot.remove();
+
+                            document.dispatchEvent(new Event('notificationRead'));
+                        }
+                    } catch (error) {
+                        console.error('Erreur:', error);
+                    }
+                }
+            }
         }
     </script>
 
-    <!-- Page Transitions System -->
+    <!-- Page Transitions System - CORRIGÉ avec vérification de session -->
     <script>
         function initPageTransitions() {
             const transitionOverlay = document.getElementById('pageTransitionOverlay');
 
             document.querySelectorAll('.page-transition').forEach(link => {
-                link.addEventListener('click', function(e) {
+                link.addEventListener('click', async function(e) {
                     if (this.target === '_blank' ||
                         this.href.includes('logout') ||
                         this.getAttribute('href').startsWith('#') ||
@@ -1461,6 +1388,32 @@ async function markNotificationRead(id, element) {
 
                     e.preventDefault();
                     const href = this.href;
+
+                    // Vérifier la session avant de naviguer
+                    try {
+                        const sessionCheck = await fetch('/api/session-check', {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            },
+                            credentials: 'same-origin'
+                        });
+                        
+                        if (!sessionCheck.ok) {
+                            // Session invalide, rediriger vers login
+                            window.location.href = '/login';
+                            return;
+                        }
+                        
+                        const sessionData = await sessionCheck.json();
+                        if (!sessionData.authenticated) {
+                            window.location.href = '/login';
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Session check error:', error);
+                        // Continuer quand même, la page cible vérifiera l'auth
+                    }
 
                     if (transitionOverlay) {
                         transitionOverlay.classList.add('active');
@@ -1489,10 +1442,8 @@ async function markNotificationRead(id, element) {
     <!-- Event Listeners -->
     <script>
         function initEventListeners() {
-            // Initialiser le système de toast
             toastSystem = new ToastSystem();
 
-            // Exposer le système de toast globalement
             window.toast = {
                 success: (title, message, options) => toastSystem.success(title, message, options),
                 error: (title, message, options) => toastSystem.error(title, message, options),
@@ -1501,7 +1452,6 @@ async function markNotificationRead(id, element) {
                 primary: (title, message, options) => toastSystem.primary(title, message, options)
             };
 
-            // Gestionnaire de déconnexion depuis le dropdown
             const logoutTrigger = document.getElementById('logoutTrigger');
             if (logoutTrigger) {
                 logoutTrigger.addEventListener('click', (e) => {
@@ -1511,7 +1461,6 @@ async function markNotificationRead(id, element) {
                 });
             }
 
-            // Gestionnaire de déconnexion depuis la sidebar
             const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
             if (sidebarLogoutBtn) {
                 sidebarLogoutBtn.addEventListener('click', (e) => {
@@ -1521,7 +1470,6 @@ async function markNotificationRead(id, element) {
                 });
             }
 
-            // Confirmation de déconnexion
             const confirmLogout = document.getElementById('confirmLogout');
             if (confirmLogout) {
                 confirmLogout.addEventListener('click', () => {
@@ -1529,7 +1477,6 @@ async function markNotificationRead(id, element) {
                 });
             }
 
-            // Gestion des erreurs AJAX
             $(document).ajaxError(function(event, xhr, settings) {
                 if (settings.silent) return;
 
@@ -1538,9 +1485,8 @@ async function markNotificationRead(id, element) {
                     message = 'Erreur de connexion. Vérifiez votre connexion Internet.';
                 } else if (xhr.status === 401) {
                     message = 'Session expirée. Veuillez vous reconnecter.';
-                    // Redirection automatique après 3 secondes
                     setTimeout(() => {
-                        document.getElementById('logout-form').submit();
+                        window.location.href = '/login';
                     }, 3000);
                 } else if (xhr.status === 403) {
                     message = 'Accès refusé.';
@@ -1553,7 +1499,6 @@ async function markNotificationRead(id, element) {
                 }
             });
 
-            // Gestion des succès AJAX
             $(document).ajaxComplete(function(event, xhr, settings) {
                 if (settings.silent || !xhr.responseJSON) return;
 
@@ -1568,7 +1513,6 @@ async function markNotificationRead(id, element) {
                 }
             });
 
-            // Ajouter un écouteur pour les liens externes
             document.addEventListener('click', function(e) {
                 const link = e.target.closest('a');
                 if (link && link.href && link.target !== '_blank' &&
@@ -1582,7 +1526,6 @@ async function markNotificationRead(id, element) {
                 }
             });
 
-            // Fonction de test pour les toasts
             window.testToasts = () => {
                 toast.success('Transaction réussie', 'Votre dépôt a été traité');
                 setTimeout(() => toast.error('Erreur de paiement', 'Le paiement a été refusé'), 1000);
@@ -1591,13 +1534,11 @@ async function markNotificationRead(id, element) {
                 setTimeout(() => toast.primary('Notification', 'Nouveau message reçu'), 4000);
             };
 
-            // Fonction pour simuler la perte de connexion (pour test)
             window.simulateOffline = () => {
                 const event = new Event('offline');
                 window.dispatchEvent(event);
             };
 
-            // Fonction pour simuler le retour en ligne (pour test)
             window.simulateOnline = () => {
                 const event = new Event('online');
                 window.dispatchEvent(event);
@@ -1605,16 +1546,14 @@ async function markNotificationRead(id, element) {
         }
     </script>
 
-
     <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('{{ url('service-worker.js') }}', {
+                navigator.serviceWorker.register('{{ route('service-worker') }}', {
                     scope: '/'
                 }).then(function(registration) {
                     console.log('Service Worker enregistré:', registration.scope);
-                    // ... reste du code
                 }).catch(function(error) {
                     console.error('Erreur ServiceWorker:', error);
                 });
@@ -1644,9 +1583,7 @@ async function markNotificationRead(id, element) {
         window.installPWA = async () => {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
-                const {
-                    outcome
-                } = await deferredPrompt.userChoice;
+                const { outcome } = await deferredPrompt.userChoice;
 
                 if (outcome === 'accepted') {
                     if (toastSystem) {
@@ -1658,9 +1595,9 @@ async function markNotificationRead(id, element) {
             }
         };
     </script>
-    <!-- AJOUTEZ CE CODE JUSTE APRÈS LA BALISE <body> DANS VOTRE LAYOUT -->
+
+    <!-- Global Modal Functions -->
     <script>
-        // Définir les fonctions globales AVANT tout autre script
         window.showPinModal = function() {
             if (!navigator.onLine) {
                 if (window.toast) {
@@ -1674,11 +1611,9 @@ async function markNotificationRead(id, element) {
                 modal.classList.add('show');
                 document.body.style.overflow = 'hidden';
 
-                // Réinitialiser les formulaires
                 const forms = modal.querySelectorAll('form');
                 forms.forEach(form => form.reset());
 
-                // Mettre le focus sur le premier champ
                 const firstInput = modal.querySelector('input');
                 if (firstInput) {
                     setTimeout(() => firstInput.focus(), 300);
@@ -1714,7 +1649,6 @@ async function markNotificationRead(id, element) {
                 return;
             }
 
-            // Récupérer le solde du portefeuille
             const balanceElement = document.getElementById('walletBalance');
             let walletBalance = 0;
             if (balanceElement) {
@@ -1729,7 +1663,6 @@ async function markNotificationRead(id, element) {
                 return;
             }
 
-            // Vérifier le PIN d'abord
             const modal = document.getElementById('verifyPinSlide');
             if (modal) {
                 modal.classList.add('show');
@@ -1742,10 +1675,8 @@ async function markNotificationRead(id, element) {
             }
         };
     </script>
-
-
-    @stack('styles')
-    @yield('styles')
+<script src="https://cdn.kkiapay.me/k.js"></script>
+    @stack('scripts')
 </body>
 
 </html>

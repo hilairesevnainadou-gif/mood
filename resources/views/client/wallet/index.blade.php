@@ -286,20 +286,18 @@
     border-radius: 20px;
 }
 
-.status-pending {
-    background: var(--warning-100);
-    color: var(--warning-700);
-}
-
-.status-approved {
-    background: var(--primary-100);
-    color: var(--primary-700);
-}
-
-.status-funded {
-    background: var(--success-100);
-    color: var(--success-700);
-}
+/* CORRECTION: Styles pour les nouveaux statuts */
+.status-submitted { background: var(--secondary-100); color: var(--secondary-700); }
+.status-under_review { background: var(--info-100); color: var(--info-700); }
+.status-validated { background: var(--primary-100); color: var(--primary-700); }
+.status-approved { background: var(--success-100); color: var(--success-700); }
+.status-paid { background: var(--warning-100); color: var(--warning-700); }
+.status-documents_validated { background: var(--info-100); color: var(--info-700); }
+.status-transfer_pending { background: var(--warning-100); color: var(--warning-700); }
+.status-completed { background: var(--success-100); color: var(--success-700); }
+.status-rejected { background: var(--error-100); color: var(--error-700); }
+.status-funded { background: var(--success-100); color: var(--success-700); }
+.status-credited { background: var(--success-100); color: var(--success-700); }
 
 .funding-info {
     display: flex;
@@ -362,6 +360,7 @@
     box-shadow: var(--shadow-sm);
 }
 
+/* CORRECTION: Styles des icônes selon les types de transaction */
 .transaction-icon {
     width: 48px;
     height: 48px;
@@ -374,6 +373,13 @@
     font-size: 1.25rem;
     flex-shrink: 0;
 }
+
+.transaction-icon.credit { background: var(--success-50); color: var(--success-500); }
+.transaction-icon.debit { background: var(--error-50); color: var(--error-500); }
+.transaction-icon.transfer { background: var(--warning-50); color: var(--warning-500); }
+.transaction-icon.payment { background: var(--info-50); color: var(--info-500); }
+.transaction-icon.fee { background: var(--secondary-50); color: var(--secondary-500); }
+.transaction-icon.refund { background: var(--primary-50); color: var(--primary-500); }
 
 .transaction-details {
     flex: 1;
@@ -941,14 +947,14 @@
                     <i class="fas fa-hand-holding-usd"></i>
                 </div>
                 <div class="funding-content">
-                    <div class="funding-title">{{ Str::limit($funding->title, 40) }}</div>
+                    <div class="funding-title">{{ Str::limit($funding->title ?? $funding->request_number, 40) }}</div>
                     <div class="funding-meta">
                         <span class="funding-date">
                             <i class="far fa-calendar"></i>
                             {{ $funding->created_at->format('d/m/Y') }}
                         </span>
                         <span class="funding-status status-{{ $funding->status }}">
-                            {{ ucfirst($funding->status) }}
+                            {{ $funding->status_label ?? ucfirst(str_replace('_', ' ', $funding->status)) }}
                         </span>
                     </div>
                     <div class="funding-info">
@@ -962,7 +968,8 @@
                         @endif
                     </div>
                 </div>
-                @if($funding->status === 'funded')
+                {{-- CORRECTION: Bouton créditer uniquement pour les statuts completed ou transfer_completed --}}
+                @if(in_array($funding->status, ['completed', 'credited']) && !$funding->credited_at)
                 <div class="funding-action">
                     <button class="funding-btn" onclick="creditFunding(event, '{{ $funding->id }}')">
                         <i class="fas fa-check-circle"></i>
@@ -1002,10 +1009,10 @@
 
             <div class="stat-card">
                 <div class="stat-icon">
-                    <i class="fas fa-hand-holding-usd"></i>
+                    <i class="fas fa-credit-card"></i>
                 </div>
-                <div class="stat-value">{{ number_format($monthlyStats['pending_fundings'] ?? 0, 0, ',', ' ') }}</div>
-                <div class="stat-label">Financements en attente</div>
+                <div class="stat-value">{{ number_format($monthlyStats['payments'] ?? 0, 0, ',', ' ') }}</div>
+                <div class="stat-label">Paiements de frais</div>
             </div>
         </div>
     </div>
@@ -1026,16 +1033,30 @@
         <div class="transactions-list">
             @foreach($transactions->take(5) as $transaction)
             <div class="transaction-item" onclick="showTransactionDetails('{{ $transaction->id }}')">
-                <div class="transaction-icon">
-                    @if($transaction->type === 'deposit')
-                        <i class="fas fa-arrow-down"></i>
-                    @elseif($transaction->type === 'withdrawal')
-                        <i class="fas fa-arrow-up"></i>
-                    @elseif($transaction->type === 'funding')
-                        <i class="fas fa-hand-holding-usd"></i>
-                    @else
-                        <i class="fas fa-exchange-alt"></i>
-                    @endif
+                {{-- CORRECTION: Icônes selon le type de transaction --}}
+                <div class="transaction-icon {{ $transaction->type }}">
+                    @switch($transaction->type)
+                        @case('credit')
+                            <i class="fas fa-arrow-down"></i>
+                            @break
+                        @case('debit')
+                            <i class="fas fa-arrow-up"></i>
+                            @break
+                        @case('transfer')
+                            <i class="fas fa-exchange-alt"></i>
+                            @break
+                        @case('payment')
+                            <i class="fas fa-credit-card"></i>
+                            @break
+                        @case('fee')
+                            <i class="fas fa-percentage"></i>
+                            @break
+                        @case('refund')
+                            <i class="fas fa-undo"></i>
+                            @break
+                        @default
+                            <i class="fas fa-circle"></i>
+                    @endswitch
                 </div>
 
                 <div class="transaction-details">
@@ -1052,8 +1073,17 @@
                 </div>
 
                 <div class="transaction-amount">
-                    <span class="{{ in_array($transaction->type, ['deposit', 'funding']) ? 'amount-positive' : 'amount-negative' }}">
-                        {{ in_array($transaction->type, ['deposit', 'funding']) ? '+' : '-' }}
+                    {{-- CORRECTION: Logique d'affichage du montant selon le type --}}
+                    @php
+                        $isPositive = in_array($transaction->type, ['credit', 'refund']);
+                        $isNegative = in_array($transaction->type, ['debit', 'payment', 'fee']);
+                    @endphp
+                    <span class="{{ $isPositive ? 'amount-positive' : ($isNegative ? 'amount-negative' : '') }}">
+                        @if($isPositive)
+                            +
+                        @elseif($isNegative)
+                            -
+                        @endif
                         {{ number_format($transaction->amount, 0, ',', ' ') }} F
                     </span>
                 </div>
@@ -1080,13 +1110,35 @@
 @endsection
 
 @push('scripts')
+
 <script>
-// DÉFINIR LES FONCTIONS GLOBALES EN PREMIER
+// ==========================================
+// VARIABLES GLOBALES
+// ==========================================
+let walletBalance = {{ $wallet->balance ?? 0 }};
+let lastRefreshTime = '{{ now()->format("Y-m-d H:i:s") }}';
+let refreshInterval;
+let autoRefreshEnabled = true;
+let pinVerified = false;
+let pinVerificationExpiry = 0;
+
+// ==========================================
+// FONCTIONS GLOBALES (window.) - DÉFINIES EN PREMIER
+// ==========================================
+
+// FERMETURE MODAL (doit être définie avant tout)
+window.closeSlide = function(slideId) {
+    const modal = document.getElementById(slideId);
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+};
+
+// MODAL PIN (changement de PIN)
 window.showPinModal = function() {
     if (!navigator.onLine) {
-        if (window.toast) {
-            window.toast.error('Mode hors ligne', 'Cette fonctionnalité nécessite une connexion Internet');
-        }
+        showToast('Mode hors ligne - Cette fonctionnalité nécessite une connexion Internet', 'error');
         return;
     }
 
@@ -1094,29 +1146,26 @@ window.showPinModal = function() {
     if (modal) {
         modal.classList.add('show');
         document.body.style.overflow = 'hidden';
-
-        // Réinitialiser les formulaires
+        
+        // Reset formulaires
         const forms = modal.querySelectorAll('form');
         forms.forEach(form => form.reset());
-
-        // Mettre le focus sur le premier champ
-        const firstInput = modal.querySelector('input');
-        if (firstInput) {
-            setTimeout(() => firstInput.focus(), 300);
-        }
+        
+        // Focus premier champ
+        setTimeout(() => {
+            const firstInput = modal.querySelector('input');
+            if (firstInput) firstInput.focus();
+        }, 300);
     } else {
         console.error('Modal PIN non trouvé');
-        if (window.toast) {
-            window.toast.error('Erreur', 'Impossible d\'ouvrir la gestion du PIN');
-        }
+        showToast('Erreur: Impossible d\'ouvrir la gestion du PIN', 'error');
     }
 };
 
+// MODAL DÉPÔT
 window.showDepositModal = function() {
     if (!navigator.onLine) {
-        if (window.toast) {
-            window.toast.error('Mode hors ligne', 'Cette fonctionnalité nécessite une connexion Internet');
-        }
+        showToast('Mode hors ligne - Cette fonctionnalité nécessite une connexion Internet', 'error');
         return;
     }
 
@@ -1127,219 +1176,357 @@ window.showDepositModal = function() {
     }
 };
 
+// MODAL RETRAIT - VERSION CORRIGÉE
 window.showWithdrawModal = function() {
     if (!navigator.onLine) {
-        if (window.toast) {
-            window.toast.error('Mode hors ligne', 'Cette fonctionnalité nécessite une connexion Internet');
-        }
+        showToast('Mode hors ligne - Cette fonctionnalité nécessite une connexion Internet', 'error');
         return;
     }
 
-    // Récupérer le solde actuel
-    const balanceElement = document.getElementById('walletBalance');
-    let currentBalance = 0;
-    if (balanceElement) {
-        const balanceText = balanceElement.textContent.replace(/\s/g, '');
-        currentBalance = parseInt(balanceText) || 0;
-    }
-
-    if (currentBalance < 1000) {
-        if (window.toast) {
-            window.toast.error('Solde insuffisant', 'Minimum 1 000 FCFA requis pour un retrait');
-        }
+    // Vérifier solde minimum
+    if (walletBalance < 1000) {
+        showToast('Solde insuffisant - Minimum 1 000 FCFA requis', 'error');
         return;
     }
 
-    // Vérifier le PIN d'abord
-    const modal = document.getElementById('verifyPinSlide');
-    if (modal) {
-        modal.classList.add('show');
-        document.body.style.overflow = 'hidden';
-        const pinInput = document.getElementById('quickPinInput');
-        if (pinInput) {
-            pinInput.value = '';
-            pinInput.focus();
-        }
+    // Vérifier si PIN déjà vérifié (moins de 30 min)
+    const pinExpiry = localStorage.getItem('wallet_pin_expiry');
+    const now = Date.now();
+    
+    if (pinExpiry && now < parseInt(pinExpiry)) {
+        // PIN encore valide, ouvrir directement le modal de retrait
+        openWithdrawModalDirect();
+    } else {
+        // PIN expiré ou non vérifié, demander vérification
+        showPinVerificationModal();
     }
 };
 
-// Variables globales pour le portefeuille
-let walletBalance = {{ $wallet->balance ?? 0 }};
-let lastRefreshTime = '{{ now()->format("Y-m-d H:i:s") }}';
-let refreshInterval;
-let autoRefreshEnabled = true;
-let pinVerified = false;
-let pinVerificationExpiry = 0;
-let pendingWithdrawAction = null;
-
-// Fonction pour ouvrir le modal de retrait (après vérification PIN)
-window.openWithdrawModal = function() {
+// Fonction interne pour ouvrir directement le modal retrait
+function openWithdrawModalDirect() {
     const modal = document.getElementById('withdrawSlide');
     if (modal) {
         modal.classList.add('show');
         document.body.style.overflow = 'hidden';
+        
+        // Reset le formulaire de retrait
+        const form = modal.querySelector('#withdrawForm');
+        if (form) {
+            form.reset();
+            // Reset récapitulatif
+            const summaryAmount = document.getElementById('summaryAmount');
+            const summaryReceive = document.getElementById('summaryReceive');
+            if (summaryAmount) summaryAmount.textContent = '0 FCFA';
+            if (summaryReceive) summaryReceive.textContent = '0 FCFA';
+        }
+        
+        // Reset méthode par défaut
+        const mobileCard = modal.querySelector('.method-card');
+        if (mobileCard) {
+            switchMethod('mobile_money', mobileCard);
+        }
     }
-};
+}
 
-// Fonction pour fermer un modal
-window.closeSlide = function(slideId) {
-    const modal = document.getElementById(slideId);
-    if (modal) {
-        modal.classList.remove('show');
-        document.body.style.overflow = 'auto';
-    }
-};
-
-// Fonction pour vérifier le PIN pour retrait
-window.verifyPinForWithdrawal = function() {
+// Afficher modal vérification PIN rapide
+function showPinVerificationModal() {
     const modal = document.getElementById('verifyPinSlide');
     if (modal) {
         modal.classList.add('show');
         document.body.style.overflow = 'hidden';
+        
         const pinInput = document.getElementById('quickPinInput');
         if (pinInput) {
             pinInput.value = '';
-            pinInput.focus();
+            setTimeout(() => pinInput.focus(), 300);
         }
     }
-};
+}
 
-// INITIALISATION
+// ==========================================
+// FONCTIONS UTILITAIRES
+// ==========================================
+
+function showToast(message, type = 'success') {
+    // Supprimer toasts existants
+    document.querySelectorAll('.toast-notification').forEach(t => t.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    
+    const icons = {
+        success: 'fa-check-circle',
+        error: 'fa-exclamation-circle',
+        warning: 'fa-exclamation-triangle',
+        info: 'fa-info-circle'
+    };
+    
+    toast.innerHTML = `
+        <i class="fas ${icons[type] || 'fa-info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
+        color: white;
+        padding: 16px 24px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 9999;
+        font-weight: 500;
+        animation: slideInRight 0.3s ease;
+        max-width: 400px;
+        line-height: 1.4;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOutRight 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+// ==========================================
+// INITIALISATION AU CHARGEMENT
+// ==========================================
 document.addEventListener('DOMContentLoaded', function() {
     initWallet();
     initSlideModals();
     initQuickPinVerification();
+    initWithdrawForm(); // NOUVEAU: Initialiser le formulaire de retrait
     startAutoRefresh();
-    checkPinVerification();
     updateFloatingButtons();
     setupFloatingButtonsBehavior();
 });
 
-// RESTE DU CODE EXISTANT...
-function setupFloatingButtonsBehavior() {
-    const floatingActions = document.querySelector('.floating-actions-top');
-    if (!floatingActions) return;
-
-    let lastScrollTop = 0;
-
-    window.addEventListener('scroll', function() {
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
-        if (window.innerWidth > 768) {
-            if (scrollTop > 100) {
-                floatingActions.style.top = '80px';
-                floatingActions.style.transition = 'top 0.3s ease';
-            } else {
-                floatingActions.style.top = '120px';
-                floatingActions.style.transition = 'top 0.3s ease';
-            }
-
-            if (scrollTop > lastScrollTop && scrollTop > 200) {
-                floatingActions.style.opacity = '0.6';
-                floatingActions.style.transform = 'translateY(-10px)';
-            } else {
-                floatingActions.style.opacity = '1';
-                floatingActions.style.transform = 'translateY(0)';
-            }
-        }
-
-        lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
-    });
-}
-
-function updateFloatingButtons() {
-    const withdrawItem = document.querySelector('.floating-action-item:nth-child(2)');
-    const withdrawMainBtn = document.querySelector('.main-action-btn.withdraw');
-
-    if (withdrawItem) {
-        if (walletBalance >= 1000) {
-            withdrawItem.style.display = 'flex';
-        } else {
-            withdrawItem.style.display = 'none';
-        }
-    }
-
-    if (withdrawMainBtn) {
-        if (walletBalance >= 1000) {
-            withdrawMainBtn.style.display = 'flex';
-        } else {
-            withdrawMainBtn.style.display = 'none';
-        }
-    }
-}
-
-function initWallet() {
-    updateWalletOnlineStatus();
-
-    window.addEventListener('online', updateWalletOnlineStatus);
-    window.addEventListener('offline', updateWalletOnlineStatus);
-
-    initWalletActions();
-}
-
-function initSlideModals() {
-    document.querySelectorAll('.slide-close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', function() {
-            const modalId = this.closest('.slide-modal').id;
-            closeSlide(modalId);
+// ==========================================
+// INITIALISATION FORMULAIRE RETRAIT
+// ==========================================
+function initWithdrawForm() {
+    const form = document.getElementById('withdrawForm');
+    if (!form) return;
+    
+    // Gestion montants rapides
+    document.querySelectorAll('.amount-chip').forEach(chip => {
+        chip.addEventListener('click', function() {
+            document.querySelectorAll('.amount-chip').forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            
+            const amount = this.dataset.amount;
+            document.getElementById('withdrawAmount').value = amount;
+            updateSummary(amount);
         });
     });
-
-    document.querySelectorAll('.slide-modal').forEach(modal => {
-        modal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeSlide(this.id);
-            }
+    
+    // Input montant manuel
+    const amountInput = document.getElementById('withdrawAmount');
+    if (amountInput) {
+        amountInput.addEventListener('input', function() {
+            updateSummary(this.value);
+            document.querySelectorAll('.amount-chip').forEach(c => c.classList.remove('active'));
         });
-    });
-
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.slide-modal.show').forEach(modal => {
-                closeSlide(modal.id);
+    }
+    
+    // Soumission formulaire
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('submitWithdraw');
+        const errorDiv = document.getElementById('validationErrors');
+        
+        // Reset erreurs
+        if (errorDiv) errorDiv.style.display = 'none';
+        
+        // Validation
+        const amount = parseFloat(document.getElementById('withdrawAmount').value);
+        const password = document.getElementById('passwordConfirm')?.value;
+        
+        const errors = [];
+        
+        if (!amount || amount < 1000) {
+            errors.push('Le montant minimum est de 1 000 FCFA');
+        }
+        
+        if (amount > walletBalance) {
+            errors.push('Solde insuffisant pour ce montant');
+        }
+        
+        if (!password || password.length < 6) {
+            errors.push('Veuillez confirmer votre mot de passe');
+        }
+        
+        // Validation selon méthode
+        const currentMethod = document.querySelector('input[name="withdraw_method"]:checked')?.value;
+        
+        if (currentMethod === 'mobile_money') {
+            const phone = document.getElementById('phoneNumber')?.value?.trim();
+            if (!phone || phone.length < 10) {
+                errors.push('Numéro de téléphone valide requis (10 chiffres)');
+            }
+        } else {
+            const accountName = document.getElementById('accountName')?.value?.trim();
+            const accountNumber = document.getElementById('accountNumber')?.value?.trim();
+            const bankName = document.getElementById('bankName')?.value?.trim();
+            
+            if (!accountName) errors.push('Nom du bénéficiaire requis');
+            if (!accountNumber) errors.push('Numéro de compte requis');
+            if (!bankName) errors.push('Nom de la banque requis');
+        }
+        
+        if (errors.length > 0) {
+            showValidationErrors(errors);
+            return;
+        }
+        
+        // Loading
+        btn.disabled = true;
+        btn.classList.add('loading');
+        
+        try {
+            const response = await fetch('{{ route("client.wallet.withdraw") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('input[name="_token"]')?.value || '',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: new FormData(form)
             });
+            
+            const data = await response.json();
+            
+            if (response.status === 422) {
+                // Erreurs validation Laravel
+                const validationErrors = [];
+                if (data.errors) {
+                    for (const field in data.errors) {
+                        data.errors[field].forEach(msg => validationErrors.push(msg));
+                    }
+                }
+                showValidationErrors(validationErrors.length > 0 ? validationErrors : [data.message || 'Erreur de validation']);
+                return;
+            }
+            
+            if (data.success === true) {
+                showToast('Demande soumise ! Référence: ' + (data.reference || 'N/A'), 'success');
+                
+                // Reset
+                form.reset();
+                updateSummary(0);
+                document.querySelectorAll('.amount-chip').forEach(c => c.classList.remove('active'));
+                
+                // Fermer et recharger
+                setTimeout(() => {
+                    closeSlide('withdrawSlide');
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showValidationErrors([data.message || 'Une erreur est survenue']);
+            }
+            
+        } catch (error) {
+            console.error('Erreur:', error);
+            showValidationErrors(['Erreur de connexion. Veuillez réessayer.']);
+        } finally {
+            btn.disabled = false;
+            btn.classList.remove('loading');
         }
     });
 }
 
+function showValidationErrors(errors) {
+    const errorDiv = document.getElementById('validationErrors');
+    const errorList = document.getElementById('errorList');
+    
+    if (!errorDiv || !errorList) return;
+    
+    if (errors.length === 1) {
+        errorList.textContent = errors[0];
+    } else {
+        errorList.innerHTML = '<ul>' + errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+    }
+    
+    errorDiv.style.display = 'flex';
+    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function updateSummary(amount) {
+    const val = parseFloat(amount) || 0;
+    const formatted = new Intl.NumberFormat('fr-FR').format(val) + ' FCFA';
+    const summaryAmount = document.getElementById('summaryAmount');
+    const summaryReceive = document.getElementById('summaryReceive');
+    
+    if (summaryAmount) summaryAmount.textContent = formatted;
+    if (summaryReceive) summaryReceive.textContent = formatted;
+}
+
+function setMaxAmount() {
+    document.getElementById('withdrawAmount').value = walletBalance;
+    updateSummary(walletBalance);
+    document.querySelectorAll('.amount-chip').forEach(c => c.classList.remove('active'));
+}
+
+function switchMethod(method, element) {
+    // Update UI
+    document.querySelectorAll('.method-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    element.classList.add('active');
+    
+    // Check radio
+    const radio = element.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+    
+    // Toggle fields
+    const mobileFields = document.getElementById('mobileFields');
+    const bankFields = document.getElementById('bankFields');
+    
+    if (method === 'mobile_money') {
+        if (mobileFields) mobileFields.classList.remove('hidden');
+        if (bankFields) bankFields.classList.add('hidden');
+    } else {
+        if (mobileFields) mobileFields.classList.add('hidden');
+        if (bankFields) bankFields.classList.remove('hidden');
+    }
+}
+
+function togglePassword(btn) {
+    const input = btn.parentElement.querySelector('input');
+    const icon = btn.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// ==========================================
+// VÉRIFICATION PIN RAPIDE
+// ==========================================
 function initQuickPinVerification() {
     const quickPinInput = document.getElementById('quickPinInput');
     if (quickPinInput) {
         quickPinInput.addEventListener('input', function() {
-            this.value = this.value.replace(/\D/g, '');
-            if (this.value.length > 6) {
-                this.value = this.value.slice(0, 6);
-            }
+            this.value = this.value.replace(/\D/g, '').substring(0, 6);
+            
             if (this.value.length === 6) {
                 setTimeout(() => {
-                    document.getElementById('quickVerifyPinForm').dispatchEvent(new Event('submit'));
+                    document.getElementById('quickVerifyPinForm')?.dispatchEvent(new Event('submit'));
                 }, 300);
             }
         });
-
-        const parent = quickPinInput.parentElement;
-        const toggleButton = document.createElement('button');
-        toggleButton.type = 'button';
-        toggleButton.className = 'toggle-pin-visibility';
-        toggleButton.innerHTML = '<i class="fas fa-eye"></i>';
-        toggleButton.style.position = 'absolute';
-        toggleButton.style.right = '15px';
-        toggleButton.style.top = '50%';
-        toggleButton.style.transform = 'translateY(-50%)';
-        toggleButton.style.background = 'none';
-        toggleButton.style.border = 'none';
-        toggleButton.style.color = 'var(--secondary-500)';
-        toggleButton.style.cursor = 'pointer';
-        toggleButton.style.fontSize = '1rem';
-
-        toggleButton.addEventListener('click', function() {
-            const isPassword = quickPinInput.type === 'password';
-            quickPinInput.type = isPassword ? 'text' : 'password';
-            this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
-        });
-
-        parent.style.position = 'relative';
-        parent.appendChild(toggleButton);
     }
 
     const quickVerifyForm = document.getElementById('quickVerifyPinForm');
@@ -1347,20 +1534,17 @@ function initQuickPinVerification() {
         quickVerifyForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const formData = new FormData(this);
-            const pin = formData.get('pin');
-
-            if (pin.length !== 6) {
-                if (window.toast) {
-                    window.toast.error('Le PIN doit contenir exactement 6 chiffres');
-                }
+            const pin = document.getElementById('quickPinInput')?.value;
+            if (!pin || pin.length !== 6) {
+                showToast('Le PIN doit contenir 6 chiffres', 'error');
                 return;
             }
 
             const button = this.querySelector('button[type="submit"]');
-            const originalText = button.innerHTML;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Vérification...';
-            button.disabled = true;
+            if (button) {
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                button.disabled = true;
+            }
 
             try {
                 const response = await fetch('{{ route("client.wallet.verify-pin") }}', {
@@ -1369,119 +1553,107 @@ function initQuickPinVerification() {
                         'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
-                    body: formData
+                    body: new FormData(this)
                 });
 
                 const data = await response.json();
 
-                if (data.success) {
-                    pinVerified = true;
-                    pinVerificationExpiry = Date.now() + (30 * 60 * 1000);
-
-                    if (window.toast) {
-                        window.toast.success('PIN vérifié', 'Vérification réussie');
-                    }
-
+                if (data.success === true) {
+                    // Stocker token
+                    const expiry = Date.now() + (30 * 60 * 1000);
+                    localStorage.setItem('wallet_pin_token', data.auth_token || '');
+                    localStorage.setItem('wallet_pin_expiry', expiry);
+                    
+                    showToast('PIN vérifié avec succès', 'success');
                     closeSlide('verifyPinSlide');
-
-                    if (data.auth_token) {
-                        localStorage.setItem('wallet_pin_token', data.auth_token);
-                        localStorage.setItem('wallet_pin_expiry', pinVerificationExpiry);
-                    }
-
-                    // Ouvrir le modal de retrait après vérification
+                    
+                    // Ouvrir modal retrait après délai
                     setTimeout(() => {
-                        openWithdrawModal();
+                        openWithdrawModalDirect();
                     }, 500);
-
-                    pendingWithdrawAction = null;
                 } else {
-                    button.innerHTML = originalText;
-                    button.disabled = false;
-                    if (window.toast) {
-                        window.toast.error('PIN incorrect', 'Veuillez réessayer');
+                    if (button) {
+                        button.innerHTML = '<i class="fas fa-unlock"></i> Vérifier';
+                        button.disabled = false;
                     }
+                    showToast('PIN incorrect', 'error');
                     quickPinInput.value = '';
                     quickPinInput.focus();
                 }
             } catch (error) {
                 console.error('Error:', error);
-                button.innerHTML = originalText;
-                button.disabled = false;
-                if (window.toast) {
-                    window.toast.error('Erreur de connexion');
+                if (button) {
+                    button.innerHTML = '<i class="fas fa-unlock"></i> Vérifier';
+                    button.disabled = false;
                 }
+                showToast('Erreur de connexion', 'error');
             }
         });
     }
 }
 
-function checkPinVerification() {
-    const pinExpiry = localStorage.getItem('wallet_pin_expiry');
-    if (pinExpiry && Date.now() < parseInt(pinExpiry)) {
-        pinVerified = true;
-        pinVerificationExpiry = parseInt(pinExpiry);
-    }
+// ==========================================
+// RESTE DES FONCTIONS (inchangées)
+// ==========================================
+function initWallet() {
+    updateWalletOnlineStatus();
+    window.addEventListener('online', updateWalletOnlineStatus);
+    window.addEventListener('offline', updateWalletOnlineStatus);
+    initWalletActions();
+}
+
+function initSlideModals() {
+    document.querySelectorAll('.slide-close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', function() {
+            const modalId = this.closest('.slide-modal')?.id;
+            if (modalId) closeSlide(modalId);
+        });
+    });
+
+    document.querySelectorAll('.slide-modal').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) closeSlide(this.id);
+        });
+    });
 }
 
 function updateWalletOnlineStatus() {
     const statusElement = document.getElementById('walletOnlineStatus');
-    if (statusElement) {
-        const isOnline = navigator.onLine;
-        const dot = statusElement.querySelector('.status-dot');
-        const text = statusElement.querySelector('span:last-child');
+    if (!statusElement) return;
+    
+    const isOnline = navigator.onLine;
+    const dot = statusElement.querySelector('.status-dot');
+    const text = statusElement.querySelector('span:last-child');
 
-        if (isOnline) {
+    if (isOnline) {
+        if (dot) {
             dot.style.background = '#22c55e';
             dot.style.animation = 'pulse 2s infinite';
-            text.textContent = 'En ligne';
-
-            if (autoRefreshEnabled) {
-                refreshBalance();
-            }
-        } else {
+        }
+        if (text) text.textContent = 'En ligne';
+        if (autoRefreshEnabled) refreshBalance();
+    } else {
+        if (dot) {
             dot.style.background = '#ef4444';
             dot.style.animation = 'none';
-            text.textContent = 'Hors ligne';
-
-            clearInterval(refreshInterval);
-
-            if (window.toast) {
-                window.toast.warning('Mode hors ligne',
-                    'Certaines fonctionnalités peuvent être limitées');
-            }
         }
+        if (text) text.textContent = 'Hors ligne';
+        clearInterval(refreshInterval);
+        showToast('Mode hors ligne - Certaines fonctionnalités limitées', 'warning');
     }
 }
 
 function initWalletActions() {
-    const actionButtons = document.querySelectorAll('.funding-btn, .main-action-btn, .floating-action-btn');
-    actionButtons.forEach(button => {
+    document.querySelectorAll('.funding-btn, .main-action-btn, .floating-action-btn').forEach(button => {
         button.addEventListener('click', function() {
             this.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                this.style.transform = '';
-            }, 150);
-        });
-
-        button.addEventListener('mouseenter', function() {
-            if (this.classList.contains('floating-action-btn')) {
-                this.style.transform = 'scale(1.1)';
-            } else {
-                this.style.transform = 'translateY(-2px)';
-            }
-        });
-
-        button.addEventListener('mouseleave', function() {
-            this.style.transform = '';
+            setTimeout(() => this.style.transform = '', 150);
         });
     });
 }
 
 async function refreshBalance() {
-    if (!navigator.onLine) {
-        return;
-    }
+    if (!navigator.onLine) return;
 
     const refreshBtn = document.querySelector('.balance-refresh-btn');
     const amountElement = document.getElementById('walletBalance');
@@ -1489,9 +1661,8 @@ async function refreshBalance() {
 
     if (refreshBtn) {
         const icon = refreshBtn.querySelector('i');
-        icon.classList.add('spin');
+        if (icon) icon.classList.add('spin');
         refreshBtn.disabled = true;
-        refreshBtn.style.opacity = '0.7';
     }
 
     try {
@@ -1503,216 +1674,98 @@ async function refreshBalance() {
             cache: 'no-cache'
         });
 
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
+        if (!response.ok) throw new Error('Network error');
 
         const data = await response.json();
 
         if (data.success) {
-            const oldBalance = walletBalance;
             walletBalance = data.wallet.balance;
-
             if (amountElement) {
                 amountElement.textContent = new Intl.NumberFormat('fr-FR').format(walletBalance);
             }
-
+            
             const now = new Date();
-            lastRefreshTime = now.toISOString();
-
             if (timeElement) {
-                timeElement.textContent = now.getHours().toString().padStart(2, '0') + ':' +
+                timeElement.textContent = now.getHours().toString().padStart(2, '0') + ':' + 
                                         now.getMinutes().toString().padStart(2, '0');
             }
-
+            
             updateFloatingButtons();
-
-            if (window.toast && Math.abs(walletBalance - oldBalance) >= 1000) {
-                const difference = walletBalance - oldBalance;
-                if (difference > 0) {
-                    window.toast.success('Nouvelle transaction',
-                        `+${new Intl.NumberFormat('fr-FR').format(difference)} F`);
-                } else if (difference < 0) {
-                    window.toast.info('Transaction débitée',
-                        `${new Intl.NumberFormat('fr-FR').format(difference)} F`);
-                }
-            }
         }
     } catch (error) {
-        console.error('Error refreshing balance:', error);
-        if (window.toast) {
-            window.toast.error('Erreur', 'Impossible de rafraîchir le solde');
-        }
+        console.error('Error:', error);
     } finally {
         if (refreshBtn) {
             const icon = refreshBtn.querySelector('i');
-            icon.classList.remove('spin');
+            if (icon) icon.classList.remove('spin');
             refreshBtn.disabled = false;
-            refreshBtn.style.opacity = '1';
         }
     }
+}
+
+function updateFloatingButtons() {
+    const withdrawItem = document.querySelector('.floating-action-item:nth-child(2)');
+    const withdrawMainBtn = document.querySelector('.main-action-btn.withdraw');
+
+    if (withdrawItem) {
+        withdrawItem.style.display = walletBalance >= 1000 ? 'flex' : 'none';
+    }
+    if (withdrawMainBtn) {
+        withdrawMainBtn.style.display = walletBalance >= 1000 ? 'flex' : 'none';
+    }
+}
+
+function setupFloatingButtonsBehavior() {
+    const floatingActions = document.querySelector('.floating-actions-top');
+    if (!floatingActions) return;
+
+    let lastScrollTop = 0;
+    window.addEventListener('scroll', function() {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        if (window.innerWidth > 768) {
+            floatingActions.style.top = scrollTop > 100 ? '80px' : '120px';
+            
+            if (scrollTop > lastScrollTop && scrollTop > 200) {
+                floatingActions.style.opacity = '0.6';
+            } else {
+                floatingActions.style.opacity = '1';
+            }
+        }
+        lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
+    });
 }
 
 function startAutoRefresh() {
     if (!autoRefreshEnabled) return;
-
-    if (navigator.onLine) {
-        refreshBalance();
-    }
-
+    if (navigator.onLine) refreshBalance();
     clearInterval(refreshInterval);
     refreshInterval = setInterval(() => {
-        if (navigator.onLine) {
-            refreshBalance();
-        }
+        if (navigator.onLine) refreshBalance();
     }, 3600000);
 }
 
-async function showFundingDetails(fundingId) {
-    if (window.toast) {
-        window.toast.info('Chargement', 'Chargement des détails...');
+// CSS pour animations toast
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
     }
-}
-
-async function creditFunding(event, fundingId) {
-    event.stopPropagation();
-
-    if (!confirm('Voulez-vous créditer ce financement sur votre portefeuille ?')) {
-        return;
+    @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
     }
-
-    if (!navigator.onLine) {
-        if (window.toast) {
-            window.toast.error('Mode hors ligne', 'Cette opération nécessite une connexion Internet');
-        }
-        return;
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
     }
-
-    const button = event.target.closest('button');
-    const originalText = button.innerHTML;
-
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Traitement...';
-    button.disabled = true;
-
-    try {
-        const response = await fetch(`/api/wallet/funding/${fundingId}/credit`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            if (window.toast) {
-                window.toast.success('Financement crédité', 'Le montant a été crédité sur votre portefeuille');
-            }
-            await refreshBalance();
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            button.innerHTML = originalText;
-            button.disabled = false;
-            if (window.toast) {
-                window.toast.error('Erreur', data.message || 'Impossible de créditer le financement');
-            }
-        }
-    } catch (error) {
-        console.error('Error crediting funding:', error);
-        button.innerHTML = originalText;
-        button.disabled = false;
-        if (window.toast) {
-            window.toast.error('Erreur', 'Une erreur est survenue');
-        }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
     }
-}
-
-function showTransactionDetails(transactionId) {
-    if (window.toast) {
-        window.toast.info('Transaction', 'Détails de transaction bientôt disponibles');
-    }
-}
-
-document.addEventListener('visibilitychange', function() {
-    if (document.hidden) {
-        clearInterval(refreshInterval);
-    } else {
-        startAutoRefresh();
-    }
-});
-
-window.addEventListener('focus', function() {
-    if (autoRefreshEnabled && navigator.onLine) {
-        refreshBalance();
-    }
-});
-
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        document.querySelectorAll('.slide-modal.show').forEach(modal => {
-            closeSlide(modal.id);
-        });
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-        e.preventDefault();
-        refreshBalance();
-    }
-
-    if (e.key === 'd' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        showDepositModal();
-    }
-
-    if (e.key === 'w' && !e.ctrlKey && !e.metaKey && walletBalance >= 1000) {
-        e.preventDefault();
-        showWithdrawModal();
-    }
-
-    if (e.key === 'p' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        showPinModal();
-    }
-});
-
-let inactivityTimer;
-function resetInactivityTimer() {
-    clearTimeout(inactivityTimer);
-    inactivityTimer = setTimeout(() => {
-        if (pinVerified) {
-            pinVerified = false;
-            localStorage.removeItem('wallet_pin_token');
-            localStorage.removeItem('wallet_pin_expiry');
-            if (window.toast) {
-                window.toast.info('Sécurité', 'Votre session PIN a expiré');
-            }
-        }
-    }, 30 * 60 * 1000);
-}
-
-['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
-    document.addEventListener(event, resetInactivityTimer);
-});
-
-resetInactivityTimer();
-
-window.addEventListener('resize', function() {
-    updateFloatingButtons();
-});
-
-function highlightFloatingButton(type) {
-    const button = document.querySelector(`.floating-action-btn.${type}`);
-    if (button) {
-        button.style.transform = 'scale(1.2)';
-        button.style.boxShadow = '0 0 30px rgba(0,0,0,0.3)';
-
-        setTimeout(() => {
-            button.style.transform = '';
-            button.style.boxShadow = '';
-        }, 300);
-    }
-}
+    .spin { animation: spin 1s linear infinite; }
+`;
+document.head.appendChild(style);
 </script>
 @endpush
-

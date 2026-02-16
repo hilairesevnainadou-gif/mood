@@ -72,7 +72,7 @@
     <div class="pwa-page-header">
         <div class="pwa-header-bg"></div>
         <div class="pwa-header-content">
-            <a href="{{ route('client.support') }}" class="pwa-back-btn">
+            <a href="{{ route('client.dashboard') }}" class="pwa-back-btn">
                 <i class="fas fa-arrow-left"></i>
             </a>
             <div class="pwa-header-text">
@@ -144,7 +144,7 @@
                 </div>
                 <h3>Aucune notification</h3>
                 <p>Vous n'avez pas encore de notifications. Revenez plus tard !</p>
-                <a href="{{ route('client.support') }}" class="pwa-btn-primary">
+                <a href="{{ route('client.support.index') }}" class="pwa-btn-primary">
                     <i class="fas fa-headset"></i> Voir mes tickets
                 </a>
             </div>

@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 <style>
-/* Design System PWA */
+/* [CSS identique à la version précédente - inchangé] */
 :root {
     --primary: #1b5a8d;
     --primary-dark: #164a77;
@@ -23,6 +23,7 @@
     --gray-800: #1f2937;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --bottom-nav-height: 70px;
 }
 
 * {
@@ -33,11 +34,11 @@
 .pro-create-container {
     background: #f5f7fa;
     min-height: 100vh;
-    padding-bottom: calc(120px + var(--safe-bottom));
+    padding-bottom: calc(140px + var(--safe-bottom) + var(--bottom-nav-height));
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    position: relative;
 }
 
-/* Header */
 .pro-header {
     background: linear-gradient(135deg, var(--primary) 0%, #0f3a5c 100%);
     padding: 1.25rem;
@@ -77,7 +78,6 @@
     transform: scale(0.95);
 }
 
-/* Content */
 .pro-create-content {
     padding: 1rem;
     display: flex;
@@ -85,9 +85,9 @@
     gap: 1rem;
     max-width: 800px;
     margin: 0 auto;
+    padding-bottom: 2rem;
 }
 
-/* Sections */
 .pro-section {
     background: white;
     border-radius: 16px;
@@ -128,7 +128,6 @@
     margin-top: -0.5rem;
 }
 
-/* Cartes de financement */
 .pro-funding-list {
     display: flex;
     flex-direction: column;
@@ -269,7 +268,6 @@
     opacity: 0.7;
 }
 
-/* Badge paiement immédiat */
 .immediate-payment-badge {
     margin-top: 0.5rem;
     font-size: 0.8rem;
@@ -288,7 +286,6 @@
     color: var(--warning);
 }
 
-/* Carte custom */
 .pro-funding-custom {
     border-color: #d1fae5;
     background: #f0fdf4;
@@ -312,7 +309,6 @@
     border-color: var(--success);
 }
 
-/* Récapitulatif type prédéfini */
 .summary-card {
     background: var(--primary-light);
     border: 1px solid #bae6fd;
@@ -365,7 +361,6 @@
     border-radius: 6px;
 }
 
-/* Formulaires */
 .pro-form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -481,7 +476,6 @@
     color: var(--error);
 }
 
-/* Erreurs */
 .pro-error-msg {
     color: var(--error);
     font-size: 0.9rem;
@@ -507,20 +501,22 @@
     border-color: var(--error) !important;
 }
 
-/* Footer sticky */
 .pro-footer-sticky {
     position: fixed;
-    bottom: 0;
+    bottom: calc(var(--bottom-nav-height) + var(--safe-bottom));
     left: 0;
     right: 0;
     padding: 1rem;
     padding-bottom: calc(1rem + var(--safe-bottom));
     background: white;
     border-top: 1px solid var(--gray-200);
-    z-index: 100;
+    z-index: 1000;
     box-shadow: 0 -4px 6px rgba(0,0,0,0.05);
     backdrop-filter: blur(10px);
-    background: rgba(255,255,255,0.95);
+    background: rgba(255,255,255,0.98);
+    max-width: 800px;
+    margin: 0 auto;
+    border-radius: 16px 16px 0 0;
 }
 
 .pro-btn-primary {
@@ -553,7 +549,6 @@
     box-shadow: 0 2px 4px -1px rgba(27,90,141,0.2);
 }
 
-/* Toast Notifications */
 .pwa-toast {
     position: fixed;
     top: 80px;
@@ -565,7 +560,7 @@
     border-radius: 50px;
     font-size: 0.9rem;
     font-weight: 500;
-    z-index: 10000;
+    z-index: 100000;
     opacity: 0;
     transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2);
@@ -582,7 +577,6 @@
 .pwa-toast.success { background: var(--success); }
 .pwa-toast.error { background: var(--error); }
 
-/* Responsive */
 @media (max-width: 640px) {
     .pro-form-row {
         grid-template-columns: 1fr;
@@ -596,9 +590,13 @@
     .pro-funding-amount {
         align-self: flex-start;
     }
+
+    .pro-footer-sticky {
+        max-width: 100%;
+        border-radius: 0;
+    }
 }
 
-/* Animation loader */
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
@@ -607,210 +605,72 @@
 .loading {
     animation: pulse 1.5s infinite;
 }
+
+.payment-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.9);
+    z-index: 99998;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.payment-loading-overlay.active {
+    display: flex;
+}
+
+.payment-loading-overlay .spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Badge mode sandbox */
+.sandbox-badge {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #f59e0b;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    z-index: 10000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
 </style>
 
-<script>
-let selectedTypeData = null;
-let isSubmitting = false;
+<!-- Badge Sandbox -->
+@if(config('services.kkiapay.sandbox', true))
+<div class="sandbox-badge">
+    <i class="fas fa-flask"></i> MODE TEST (SANDBOX)
+</div>
+@endif
 
-function selectFundingType(typeId, isCustom = false) {
-    // Feedback haptique
-    if (navigator.vibrate) navigator.vibrate(15);
-
-    // Réinitialiser les cartes
-    document.querySelectorAll('.pro-funding-card').forEach(card => {
-        card.classList.remove('active');
-    });
-
-    const selectedCard = document.getElementById(isCustom ? 'card-custom' : 'card-' + typeId);
-    if (selectedCard) selectedCard.classList.add('active');
-
-    // Gérer les inputs cachés
-    document.getElementById('is_custom_input').value = isCustom ? '1' : '0';
-    document.getElementById('funding_type_id_input').value = isCustom ? '' : typeId;
-
-    // Gérer l'affichage des badges
-    document.querySelectorAll('.immediate-payment-badge').forEach(el => el.style.display = 'none');
-
-    // Afficher la section détails (toujours visible maintenant)
-    const detailsSection = document.getElementById('funding-details-section');
-    detailsSection.style.display = 'block';
-
-    if (!isCustom && selectedCard) {
-        // Type prédéfini : récupérer les données
-        selectedTypeData = {
-            amount: selectedCard.dataset.amount,
-            duration: selectedCard.dataset.duration,
-            fee: selectedCard.dataset.fee,
-            name: selectedCard.querySelector('h4').textContent
-        };
-
-        // Afficher le badge paiement immédiat
-        selectedCard.querySelector('.immediate-payment-badge').style.display = 'inline-flex';
-
-        // Pré-remplir les champs
-        document.getElementById('amount_requested').value = selectedTypeData.amount;
-        document.getElementById('duration').value = selectedTypeData.duration;
-
-        // Afficher le récapitulatif
-        showSummary(selectedTypeData);
-    } else {
-        // Mode custom : vider les champs
-        selectedTypeData = null;
-        document.getElementById('amount_requested').value = '';
-        document.getElementById('duration').value = '';
-        document.getElementById('type-summary').style.display = 'none';
-
-        // Focus sur le premier champ après un délai
-        setTimeout(() => {
-            document.getElementById('amount_requested').focus();
-        }, 300);
-    }
-
-    // Scroll vers la section détails sur mobile
-    if (window.innerWidth < 768) {
-        setTimeout(() => {
-            detailsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-    }
-
-    checkFormValidity();
-}
-
-function showSummary(data) {
-    const summaryDiv = document.getElementById('type-summary');
-    summaryDiv.innerHTML = `
-        <div class="summary-card">
-            <div class="summary-row">
-                <span>Formule:</span>
-                <strong>${data.name}</strong>
-            </div>
-            <div class="summary-row">
-                <span>Montant suggéré:</span>
-                <strong>${parseInt(data.amount).toLocaleString('fr-FR')} FCFA</strong>
-            </div>
-            <div class="summary-row">
-                <span>Durée:</span>
-                <strong>${data.duration} mois</strong>
-            </div>
-            <div class="summary-row fee-row">
-                <span>Frais d'inscription:</span>
-                <strong>${parseInt(data.fee).toLocaleString('fr-FR')} FCFA</strong>
-            </div>
-            <small class="summary-hint">
-                <i class="fas fa-pencil-alt"></i> Vous pouvez ajuster le montant et la durée ci-dessous
-            </small>
-        </div>
-    `;
-    summaryDiv.style.display = 'block';
-}
-
-function checkFormValidity() {
-    const hasSelectedType = document.getElementById('funding_type_id_input').value !== '' || document.getElementById('is_custom_input').value === '1';
-    const title = document.getElementById('project_title').value.trim().length > 0;
-    const description = document.getElementById('project_desc').value.trim().length >= 50;
-
-    // Validation des champs financiers (toujours requis maintenant)
-    const amount = parseFloat(document.getElementById('amount_requested').value) || 0;
-    const duration = parseInt(document.getElementById('duration').value) || 0;
-    const financialValid = amount >= 1000 && duration >= 6 && duration <= 60;
-
-    const btn = document.getElementById('submit-btn');
-    const isValid = hasSelectedType && title && description && financialValid;
-
-    btn.disabled = !isValid || isSubmitting;
-    btn.style.opacity = (isValid && !isSubmitting) ? '1' : '0.5';
-
-    // Mettre à jour le texte du bouton
-    if (isValid) {
-        const isPredefined = document.getElementById('funding_type_id_input').value !== '';
-        const btnText = btn.querySelector('span');
-        if (isPredefined) {
-            btnText.textContent = 'Continuer vers le paiement';
-        } else {
-            btnText.textContent = 'Soumettre pour examen';
-        }
-    }
-}
-
-function updateCharCount() {
-    const len = document.getElementById('project_desc').value.length;
-    const counter = document.getElementById('char-count');
-    counter.textContent = len;
-
-    if (len >= 50) {
-        counter.classList.add('valid');
-        counter.classList.remove('invalid');
-    } else {
-        counter.classList.add('invalid');
-        counter.classList.remove('valid');
-    }
-    checkFormValidity();
-}
-
-// Gestion de la soumission
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('create-form');
-
-    form.addEventListener('submit', function(e) {
-        if (isSubmitting) {
-            e.preventDefault();
-            return;
-        }
-
-        const isPredefined = document.getElementById('funding_type_id_input').value !== '';
-
-        if (isPredefined && selectedTypeData) {
-            const currentAmount = parseFloat(document.getElementById('amount_requested').value);
-            const originalAmount = parseFloat(selectedTypeData.amount);
-
-            // Vérifier si l'utilisateur a modifié le montant
-            if (currentAmount !== originalAmount) {
-                if (!confirm(`Attention : vous avez modifié le montant de ${originalAmount.toLocaleString('fr-FR')} à ${currentAmount.toLocaleString('fr-FR')} FCFA.\n\nContinuer avec ce montant ?`)) {
-                    e.preventDefault();
-                    return false;
-                }
-            }
-        }
-
-        isSubmitting = true;
-        const btn = document.getElementById('submit-btn');
-        btn.disabled = true;
-        btn.classList.add('loading');
-        btn.querySelector('span').textContent = 'Traitement...';
-    });
-
-    // Validation en temps réel sur les inputs
-    ['amount_requested', 'duration', 'project_title', 'project_desc'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('input', checkFormValidity);
-        }
-    });
-});
-
-// Toast helper
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `pwa-toast ${type} show`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// Gestion offline/online
-window.addEventListener('offline', () => {
-    showToast('Mode hors ligne. Veuillez vérifier votre connexion.', 'error');
-});
-
-window.addEventListener('online', () => {
-    showToast('Connexion rétablie', 'success');
-});
-</script>
+<!-- Overlay de chargement -->
+<div id="payment-loading" class="payment-loading-overlay">
+    <div class="spinner"></div>
+    <p>Initialisation du paiement...</p>
+    <small style="margin-top: 1rem; opacity: 0.8;">
+        Utilisez le numéro de test: <strong>97000000</strong><br>
+        Code OTP: <strong>123456</strong>
+    </small>
+</div>
 
 <div class="pro-create-container">
     {{-- Header --}}
@@ -901,11 +761,10 @@ window.addEventListener('online', () => {
                 @enderror
             </div>
 
-            {{-- Étape 2: Détails du financement (TOUJOURS AFFICHÉ APRÈS SÉLECTION) --}}
+            {{-- Étape 2: Détails du financement --}}
             <div class="pro-section" id="funding-details-section" style="display: none;">
                 <h3 class="pro-section-title">2. Montant et durée</h3>
 
-                {{-- Récapitulatif pour types prédéfinis --}}
                 <div id="type-summary" style="display: none;"></div>
 
                 <div class="pro-form-row">
@@ -1001,11 +860,33 @@ window.addEventListener('online', () => {
                     <div>
                         <h4 style="margin: 0 0 0.5rem 0; color: var(--primary); font-size: 0.95rem;">Paiement sécurisé</h4>
                         <p style="margin: 0; color: var(--gray-600); font-size: 0.85rem; line-height: 1.4;">
-                            Pour les formules prédéfinies, vous serez invité à payer les frais d'inscription immédiatement après la soumission. Les demandes personnalisées seront examinées sous 24-48h.
+                            Pour les formules prédéfinies, le paiement des frais d'inscription est immédiat via notre partenaire sécurisé Kkiapay.
+                            Les demandes personnalisées sont gratuites à la soumission, le paiement sera demandé après validation de votre dossier.
                         </p>
                     </div>
                 </div>
             </div>
+
+            {{-- Info Sandbox --}}
+            @if(config('services.kkiapay.sandbox', true))
+            <div class="pro-section" style="background: #fef3c7; border: 1px solid #fde68a;">
+                <div style="display: flex; gap: 1rem; align-items: flex-start;">
+                    <i class="fas fa-vial" style="color: #92400e; font-size: 1.5rem; margin-top: 0.2rem;"></i>
+                    <div>
+                        <h4 style="margin: 0 0 0.5rem 0; color: #92400e; font-size: 0.95rem;">Mode Test (Sandbox)</h4>
+                        <p style="margin: 0; color: #92400e; font-size: 0.85rem; line-height: 1.4;">
+                            <strong>Numéro de test:</strong> 97000000<br>
+                            <strong>Code OTP:</strong> 123456<br>
+                            <strong>Code secret:</strong> 1234<br>
+                            <small>Aucun vrai prélèvement ne sera effectué.</small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            {{-- Espace supplémentaire --}}
+            <div style="height: 120px;"></div>
 
         </div>
 
@@ -1018,4 +899,461 @@ window.addEventListener('online', () => {
         </div>
     </form>
 </div>
+
+<!-- Script Kkiapay SDK -->
+<script src="https://cdn.kkiapay.me/k.js"></script>
+
+<script>
+// Variables globales
+let selectedTypeData = null;
+let isSubmitting = false;
+
+// Configuration Kkiapay depuis Laravel config
+const KKIAPAY_CONFIG = {
+    key: '{{ config("services.kkiapay.public_key", "") }}',
+    sandbox: {{ config("services.kkiapay.sandbox", true) ? 'true' : 'false' }},
+    url: '{{ asset("images/logo.png") }}',
+    callback: '{{ url("/kkiapay/callback") }}'
+};
+
+// CORRECTION: Séparer l'indicatif du numéro de téléphone
+const USER_RAW = {
+    phone: '{{ Auth::user()->phone ?? "" }}', // Ex: +22966185598 ou 66185598
+    name: '{{ Auth::user()->name ?? "" }}',
+    email: '{{ Auth::user()->email ?? "" }}'
+};
+
+// Numéro de test officiel Kkiapay pour sandbox
+const TEST_PHONE_NUMBER = '97000000';
+
+/**
+ * Extrait le numéro sans indicatif pays
+ * Supporte: +22966185598, 0022966185598, 66185598
+ */
+function extractPhoneNumber(phone) {
+    if (!phone) return '';
+
+    // Supprimer les espaces et tirets
+    phone = phone.replace(/[\s\-]/g, '');
+
+    // Supprimer l'indicatif +229 ou 00229
+    if (phone.startsWith('+229')) {
+        return phone.substring(4);
+    }
+    if (phone.startsWith('00229')) {
+        return phone.substring(5);
+    }
+    if (phone.startsWith('229') && phone.length > 8) {
+        return phone.substring(3);
+    }
+
+    // Si commence déjà par 9, 6, 7 (numéro local BJ), retourner tel quel
+    if (/^[967]/.test(phone) && phone.length === 8) {
+        return phone;
+    }
+
+    return phone;
+}
+
+/**
+ * Retourne le numéro à utiliser pour Kkiapay
+ * En sandbox: utilise le numéro de test
+ * En production: extrait le numéro sans indicatif
+ */
+function getKkiapayPhone() {
+    // Si mode sandbox, proposer le numéro de test par défaut
+    if (KKIAPAY_CONFIG.sandbox) {
+        const userPhone = extractPhoneNumber(USER_RAW.phone);
+        // Si l'utilisateur a déjà un numéro valide, l'utiliser, sinon test
+        return userPhone && userPhone.length === 8 ? userPhone : TEST_PHONE_NUMBER;
+    }
+
+    // Mode production: numéro sans indicatif
+    return extractPhoneNumber(USER_RAW.phone);
+}
+
+// Debug: afficher la configuration
+console.log('Kkiapay Config:', {
+    ...KKIAPAY_CONFIG,
+    phoneRaw: USER_RAW.phone,
+    phoneFormatted: getKkiapayPhone(),
+    mode: KKIAPAY_CONFIG.sandbox ? 'SANDBOX' : 'PRODUCTION'
+});
+
+// ==================== FONCTIONS DE SÉLECTION ====================
+
+function selectFundingType(typeId, isCustom = false) {
+    if (navigator.vibrate) navigator.vibrate(15);
+
+    document.querySelectorAll('.pro-funding-card').forEach(card => {
+        card.classList.remove('active');
+    });
+
+    const selectedCard = document.getElementById(isCustom ? 'card-custom' : 'card-' + typeId);
+    if (selectedCard) selectedCard.classList.add('active');
+
+    document.getElementById('is_custom_input').value = isCustom ? '1' : '0';
+    document.getElementById('funding_type_id_input').value = isCustom ? '' : typeId;
+
+    document.querySelectorAll('.immediate-payment-badge').forEach(el => el.style.display = 'none');
+
+    const detailsSection = document.getElementById('funding-details-section');
+    detailsSection.style.display = 'block';
+
+    if (!isCustom && selectedCard) {
+        const amount = parseFloat(selectedCard.dataset.amount) || 0;
+        const duration = parseInt(selectedCard.dataset.duration) || 0;
+        const fee = parseFloat(selectedCard.dataset.fee) || 0;
+
+        selectedTypeData = {
+            amount: amount,
+            duration: duration,
+            fee: fee,
+            name: selectedCard.querySelector('h4').textContent
+        };
+
+        selectedCard.querySelector('.immediate-payment-badge').style.display = 'inline-flex';
+
+        document.getElementById('amount_requested').value = amount;
+        document.getElementById('duration').value = duration;
+
+        showSummary(selectedTypeData);
+    } else {
+        selectedTypeData = null;
+        document.getElementById('amount_requested').value = '';
+        document.getElementById('duration').value = '';
+        document.getElementById('type-summary').style.display = 'none';
+
+        setTimeout(() => {
+            document.getElementById('amount_requested').focus();
+        }, 300);
+    }
+
+    if (window.innerWidth < 768) {
+        setTimeout(() => {
+            detailsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+
+    checkFormValidity();
+}
+
+function showSummary(data) {
+    const summaryDiv = document.getElementById('type-summary');
+    summaryDiv.innerHTML = `
+        <div class="summary-card">
+            <div class="summary-row">
+                <span>Formule:</span>
+                <strong>${data.name}</strong>
+            </div>
+            <div class="summary-row">
+                <span>Montant suggéré:</span>
+                <strong>${Math.round(data.amount).toLocaleString('fr-FR')} FCFA</strong>
+            </div>
+            <div class="summary-row">
+                <span>Durée:</span>
+                <strong>${data.duration} mois</strong>
+            </div>
+            <div class="summary-row fee-row">
+                <span>Frais d'inscription:</span>
+                <strong>${Math.round(data.fee).toLocaleString('fr-FR')} FCFA</strong>
+            </div>
+            <small class="summary-hint">
+                <i class="fas fa-pencil-alt"></i> Vous pouvez ajuster le montant et la durée ci-dessous
+            </small>
+        </div>
+    `;
+    summaryDiv.style.display = 'block';
+}
+
+// ==================== VALIDATION DU FORMULAIRE ====================
+
+function checkFormValidity() {
+    const hasSelectedType = document.getElementById('funding_type_id_input').value !== '' ||
+                          document.getElementById('is_custom_input').value === '1';
+    const title = document.getElementById('project_title').value.trim().length > 0;
+    const description = document.getElementById('project_desc').value.trim().length >= 50;
+
+    const amount = parseFloat(document.getElementById('amount_requested').value) || 0;
+    const duration = parseInt(document.getElementById('duration').value) || 0;
+    const financialValid = amount >= 1000 && duration >= 6 && duration <= 60;
+
+    const btn = document.getElementById('submit-btn');
+    const isValid = hasSelectedType && title && description && financialValid;
+
+    btn.disabled = !isValid || isSubmitting;
+    btn.style.opacity = (isValid && !isSubmitting) ? '1' : '0.5';
+
+    if (isValid) {
+        const isPredefined = document.getElementById('funding_type_id_input').value !== '';
+        const btnText = btn.querySelector('span');
+        if (isPredefined && selectedTypeData) {
+            const fee = Math.round(selectedTypeData.fee);
+            btnText.textContent = `Payer ${fee.toLocaleString('fr-FR')} FCFA`;
+        } else {
+            btnText.textContent = 'Soumettre pour examen';
+        }
+    } else {
+        btn.querySelector('span').textContent = 'Soumettre la demande';
+    }
+}
+
+function updateCharCount() {
+    const len = document.getElementById('project_desc').value.length;
+    const counter = document.getElementById('char-count');
+    counter.textContent = len;
+
+    if (len >= 50) {
+        counter.classList.add('valid');
+        counter.classList.remove('invalid');
+    } else {
+        counter.classList.add('invalid');
+        counter.classList.remove('valid');
+    }
+    checkFormValidity();
+}
+
+// ==================== INTÉGRATION KKIAPAY CORRIGÉE ====================
+
+/**
+ * Ouvre le widget Kkiapay avec les paramètres corrigés
+ * CORRECTION: Numéro sans indicatif pays
+ */
+function openKkiapayPayment(amount, motif, requestData) {
+    const loadingOverlay = document.getElementById('payment-loading');
+
+    try {
+        loadingOverlay.classList.add('active');
+
+        const parsedAmount = parseInt(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            throw new Error('Montant invalide: ' + amount);
+        }
+
+        // CORRECTION: Préparer le numéro sans indicatif
+        const phoneNumber = getKkiapayPhone();
+
+        console.log('Ouverture Kkiapay:', {
+            amount: parsedAmount,
+            phone: phoneNumber,
+            phoneRaw: USER_RAW.phone,
+            mode: KKIAPAY_CONFIG.sandbox ? 'SANDBOX' : 'PROD'
+        });
+
+        // Configuration selon documentation officielle Kkiapay
+        const config = {
+            amount: parsedAmount,
+            key: KKIAPAY_CONFIG.key,
+            url: KKIAPAY_CONFIG.url,
+            position: 'center',
+            sandbox: KKIAPAY_CONFIG.sandbox,
+            // CORRECTION: phone sans indicatif +229
+            phone: phoneNumber,
+            name: USER_RAW.name,
+            email: USER_RAW.email,
+            data: JSON.stringify({
+                request_data: requestData,
+                motif: motif,
+                timestamp: Date.now(),
+                user_phone_raw: USER_RAW.phone,
+                user_phone_formatted: phoneNumber
+            }),
+            callback: KKIAPAY_CONFIG.callback
+        };
+
+        // Vérifier que l'API est disponible
+        if (typeof openKkiapayWidget !== 'function') {
+            throw new Error('API Kkiapay non disponible. Vérifiez que le SDK est chargé.');
+        }
+
+        // Ouvrir le widget
+        openKkiapayWidget(config);
+
+        // Configurer les listeners
+        setupKkiapayListeners();
+
+        loadingOverlay.classList.remove('active');
+
+    } catch (error) {
+        console.error('Erreur Kkiapay:', error);
+        loadingOverlay.classList.remove('active');
+        showToast('Erreur: ' + error.message, 'error');
+        isSubmitting = false;
+        checkFormValidity();
+    }
+}
+
+/**
+ * Configure les listeners d'événements Kkiapay
+ */
+function setupKkiapayListeners() {
+    if (window.kkiapayListenersConfigured) return;
+    window.kkiapayListenersConfigured = true;
+
+    console.log('Configuration des listeners Kkiapay');
+
+    // Succès
+    if (typeof addSuccessListener === 'function') {
+        addSuccessListener(function(response) {
+            console.log('Paiement réussi:', response);
+            handlePaymentSuccess(response);
+        });
+    }
+
+    // Échec
+    if (typeof addFailedListener === 'function') {
+        addFailedListener(function(error) {
+            console.log('Paiement échoué:', error);
+            handlePaymentFailure(error);
+        });
+    }
+
+    // Fermeture
+    if (typeof addKkiapayCloseListener === 'function') {
+        addKkiapayCloseListener(function() {
+            console.log('Widget fermé');
+            if (isSubmitting) {
+                isSubmitting = false;
+                checkFormValidity();
+            }
+        });
+    }
+}
+
+/**
+ * Gestion du succès de paiement
+ */
+function handlePaymentSuccess(response) {
+    showToast('Paiement réussi! Finalisation...', 'success');
+
+    const form = document.getElementById('create-form');
+
+    // Supprimer l'ancien input
+    const oldInput = form.querySelector('input[name="kkiapay_transaction"]');
+    if (oldInput) oldInput.remove();
+
+    // Ajouter les données de transaction
+    const paymentInput = document.createElement('input');
+    paymentInput.type = 'hidden';
+    paymentInput.name = 'kkiapay_transaction';
+    paymentInput.value = JSON.stringify(response);
+    form.appendChild(paymentInput);
+
+    form.submit();
+}
+
+/**
+ * Gestion de l'échec de paiement
+ */
+function handlePaymentFailure(error) {
+    showToast('Le paiement a échoué. Vous pouvez réessayer.', 'error');
+    isSubmitting = false;
+    checkFormValidity();
+}
+
+// ==================== GESTION DE LA SOUMISSION ====================
+
+function handleFormSubmit(e) {
+    if (isSubmitting) {
+        e.preventDefault();
+        return false;
+    }
+
+    const isPredefined = document.getElementById('funding_type_id_input').value !== '';
+    const isCustom = document.getElementById('is_custom_input').value === '1';
+
+    if (isPredefined && selectedTypeData) {
+        e.preventDefault();
+
+        const currentAmount = parseFloat(document.getElementById('amount_requested').value) || 0;
+        const originalAmount = selectedTypeData.amount;
+        const fee = selectedTypeData.fee;
+
+        if (currentAmount !== originalAmount) {
+            if (!confirm(`Attention : vous avez modifié le montant de ${originalAmount.toLocaleString('fr-FR')} à ${currentAmount.toLocaleString('fr-FR')} FCFA.\n\nContinuer avec ce montant ?`)) {
+                return false;
+            }
+        }
+
+        if (!fee || fee <= 0) {
+            showToast('Erreur: Frais d\'inscription invalides', 'error');
+            return false;
+        }
+
+        isSubmitting = true;
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        const requestData = {
+            title: document.getElementById('project_title').value.trim(),
+            description: document.getElementById('project_desc').value.trim(),
+            amount_requested: currentAmount,
+            duration: parseInt(document.getElementById('duration').value) || 0,
+            funding_type_id: document.getElementById('funding_type_id_input').value,
+            is_custom: 0
+        };
+
+        openKkiapayPayment(fee, 'Frais inscription ' + selectedTypeData.name, requestData);
+
+    } else if (isCustom) {
+        isSubmitting = true;
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.classList.add('loading');
+        btn.querySelector('span').textContent = 'Envoi en cours...';
+    }
+}
+
+// ==================== INITIALISATION ====================
+
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('create-form');
+    form.addEventListener('submit', handleFormSubmit);
+
+    ['amount_requested', 'duration', 'project_title', 'project_desc'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', function() {
+                if (id === 'project_desc') updateCharCount();
+                else checkFormValidity();
+            });
+        }
+    });
+
+    // Vérifier SDK
+    window.addEventListener('load', function() {
+        if (typeof openKkiapayWidget === 'function') {
+            console.log('✓ SDK Kkiapay chargé');
+        } else {
+            console.warn('✗ SDK Kkiapay non détecté');
+        }
+    });
+});
+
+// ==================== UTILITAIRES ====================
+
+function showToast(message, type = 'success') {
+    document.querySelectorAll('.pwa-toast').forEach(t => t.remove());
+
+    const toast = document.createElement('div');
+    toast.className = `pwa-toast ${type} show`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+window.addEventListener('offline', () => {
+    showToast('Mode hors ligne. Vérifiez votre connexion.', 'error');
+});
+
+window.addEventListener('online', () => {
+    showToast('Connexion rétablie', 'success');
+});
+</script>
+
 @endsection

@@ -12,208 +12,143 @@
                 @csrf
 
                 <!-- Section montant -->
-                <div class="mtn-form-group">
-                    <label class="mtn-form-label">Montant à déposer</label>
+                <div class="form-section">
+                    <label class="section-label">
+                        <i class="fas fa-money-bill-wave"></i>
+                        Montant à déposer
+                    </label>
 
                     <!-- Montants rapides -->
-                    <div class="amount-selector">
-                        <button type="button" class="amount-option" data-amount="1000">
-                            <span class="amount">1 000</span>
-                            <span class="currency">F</span>
+                    <div class="amount-grid">
+                        <button type="button" class="amount-card" data-amount="1000">
+                            <span class="amount-value">1 000</span>
+                            <span class="amount-currency">FCFA</span>
                         </button>
-                        <button type="button" class="amount-option" data-amount="5000">
-                            <span class="amount">5 000</span>
-                            <span class="currency">F</span>
+                        <button type="button" class="amount-card" data-amount="5000">
+                            <span class="amount-value">5 000</span>
+                            <span class="amount-currency">FCFA</span>
                         </button>
-                        <button type="button" class="amount-option" data-amount="10000">
-                            <span class="amount">10 000</span>
-                            <span class="currency">F</span>
+                        <button type="button" class="amount-card" data-amount="10000">
+                            <span class="amount-value">10 000</span>
+                            <span class="amount-currency">FCFA</span>
                         </button>
-                        <button type="button" class="amount-option" data-amount="20000">
-                            <span class="amount">20 000</span>
-                            <span class="currency">F</span>
+                        <button type="button" class="amount-card" data-amount="20000">
+                            <span class="amount-value">20 000</span>
+                            <span class="amount-currency">FCFA</span>
                         </button>
-                        <button type="button" class="amount-option" data-amount="50000">
-                            <span class="amount">50 000</span>
-                            <span class="currency">F</span>
+                        <button type="button" class="amount-card" data-amount="50000">
+                            <span class="amount-value">50 000</span>
+                            <span class="amount-currency">FCFA</span>
                         </button>
-                        <button type="button" class="amount-option" data-amount="100000">
-                            <span class="amount">100 000</span>
-                            <span class="currency">F</span>
+                        <button type="button" class="amount-card" data-amount="100000">
+                            <span class="amount-value">100 000</span>
+                            <span class="amount-currency">FCFA</span>
                         </button>
                     </div>
 
                     <!-- Input montant personnalisé -->
-                    <div class="input-with-icon" style="margin-top: 15px;">
-                        <i class="fas fa-money-bill-wave"></i>
-                        <input type="number"
-                               class="mtn-form-control"
-                               id="depositAmount"
-                               name="amount"
-                               placeholder="Ou saisir un montant personnalisé"
-                               min="1000"
-                               step="100"
-                               required>
+                    <div class="custom-amount-wrapper">
+                        <div class="input-icon-wrapper">
+                            <i class="fas fa-pen"></i>
+                            <input type="number"
+                                   class="form-input"
+                                   id="depositAmount"
+                                   name="amount"
+                                   placeholder="Montant personnalisé"
+                                   min="100"
+                                   step="100">
+                        </div>
+                        <span class="input-suffix">FCFA</span>
                     </div>
-                    <small class="form-hint">
+
+                    <p class="hint-text">
                         <i class="fas fa-info-circle"></i>
-                        Montant minimum : 1 000 FCFA
-                    </small>
+                        Minimum : 100 FCFA • Maximum : 10 000 000 FCFA
+                    </p>
                 </div>
 
-                <!-- Section Mobile Money -->
-                <div class="mtn-form-group" style="margin-top: 2rem;">
-                    <div class="section-title">
+                <!-- Section téléphone -->
+                <div class="form-section">
+                    <label class="section-label">
                         <i class="fas fa-mobile-alt"></i>
-                        <h4>Informations Mobile Money</h4>
+                        Numéro de paiement
+                    </label>
+
+                    <div class="phone-input-wrapper">
+                        <span class="phone-prefix">+229</span>
+                        <input type="tel"
+                               class="form-input phone-input"
+                               id="paymentPhone"
+                               name="phone"
+                               placeholder="01 97 89 90 67"
+                               maxlength="10"
+                               value="{{ preg_replace('/^(?:\+229|00229|229)/', '', Auth::user()->phone ?? '') }}">
                     </div>
 
-                    <!-- Numéro de téléphone -->
-                    <div class="mtn-form-group" style="margin-bottom: 1.5rem;">
-                        <label class="mtn-form-label">
-                            <i class="fas fa-phone"></i>
-                            Numéro de téléphone
-                        </label>
-                        <div class="input-with-icon">
-                            <i class="fas fa-phone"></i>
-                            <input type="tel"
-                                   class="mtn-form-control"
-                                   name="phone_number"
-                                   placeholder="Ex: 07 00 00 00 00"
-                                   pattern="[0-9\s]{10,20}"
-                                   required>
-                        </div>
-                        <small class="form-hint">
-                            Entrez votre numéro Mobile Money (Orange, MTN, Moov ou Wave)
-                        </small>
+                    <p class="hint-text">
+                        <i class="fas fa-shield-alt"></i>
+                        Ce numéro sera utilisé pour valider le paiement sur votre téléphone
+                    </p>
+                </div>
+
+                <!-- Récapitulatif -->
+                <div class="summary-card" id="summaryCard" style="display: none;">
+                    <div class="summary-row">
+                        <span>Montant</span>
+                        <strong id="summaryAmount">0 FCFA</strong>
                     </div>
-
-                    <!-- Opérateur - SELECT CUSTOM PROFESSIONNEL -->
-                    <div class="mtn-form-group">
-                        <label class="mtn-form-label">
-                            <i class="fas fa-sim-card"></i>
-                            Opérateur Mobile Money
-                        </label>
-
-                        <!-- Container custom select -->
-                        <div class="custom-select-container">
-                            <div class="custom-select-trigger" id="operatorTrigger">
-                                <span class="select-placeholder">Choisir votre opérateur</span>
-                                <i class="fas fa-chevron-down select-arrow"></i>
-                            </div>
-
-                            <!-- Options customisées -->
-                            <div class="custom-select-options" id="operatorOptions">
-                                <input type="hidden" name="mobile_operator" id="mobileOperatorInput" required>
-
-                                <div class="custom-select-option" data-value="orange">
-                                    <div class="option-content">
-                                        <div class="operator-badge orange">
-                                            <i class="fas fa-fire"></i>
-                                        </div>
-                                        <div class="option-text">
-                                            <div class="option-title">Orange Money</div>
-                                            <div class="option-description">07, 05, 04</div>
-                                        </div>
-                                        <i class="fas fa-check option-check"></i>
-                                    </div>
-                                </div>
-
-                                <div class="custom-select-option" data-value="mtn">
-                                    <div class="option-content">
-                                        <div class="operator-badge mtn">
-                                            <i class="fas fa-bolt"></i>
-                                        </div>
-                                        <div class="option-text">
-                                            <div class="option-title">MTN Mobile Money</div>
-                                            <div class="option-description">06, 05</div>
-                                        </div>
-                                        <i class="fas fa-check option-check"></i>
-                                    </div>
-                                </div>
-
-                                <div class="custom-select-option" data-value="moov">
-                                    <div class="option-content">
-                                        <div class="operator-badge moov">
-                                            <i class="fas fa-leaf"></i>
-                                        </div>
-                                        <div class="option-text">
-                                            <div class="option-title">Moov Money</div>
-                                            <div class="option-description">01, 02</div>
-                                        </div>
-                                        <i class="fas fa-check option-check"></i>
-                                    </div>
-                                </div>
-
-                                <div class="custom-select-option" data-value="wave">
-                                    <div class="option-content">
-                                        <div class="operator-badge wave">
-                                            <i class="fas fa-water"></i>
-                                        </div>
-                                        <div class="option-text">
-                                            <div class="option-title">Wave</div>
-                                            <div class="option-description">09</div>
-                                        </div>
-                                        <i class="fas fa-check option-check"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <small class="form-hint">
-                            Sélectionnez votre opérateur Mobile Money
-                        </small>
+                    <div class="summary-row">
+                        <span>Frais</span>
+                        <strong class="text-success">0 FCFA</strong>
+                    </div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-row total">
+                        <span>Total à payer</span>
+                        <strong id="summaryTotal">0 FCFA</strong>
                     </div>
                 </div>
 
-                <!-- Bouton de confirmation -->
-                <div class="mtn-form-group" style="margin-top: 2rem;">
-                    <button type="submit" class="mtn-btn primary confirm-btn">
-                        <i class="fas fa-mobile-alt"></i>
-                        <span class="btn-text">Confirmer le dépôt</span>
-                        <span class="btn-amount" id="confirmAmount">0 F</span>
-                    </button>
-                </div>
-
-                <!-- Étapes du processus -->
-                <div class="process-steps">
-                    <h5>
-                        <i class="fas fa-list-ol"></i>
-                        Étapes du dépôt :
-                    </h5>
-                    <div class="steps-container">
-                        <div class="step">
-                            <div class="step-number">1</div>
-                            <div class="step-content">
-                                <div class="step-title">Saisissez le montant</div>
-                                <div class="step-description">Choisissez ou entrez le montant à déposer</div>
-                            </div>
-                        </div>
-                        <div class="step">
-                            <div class="step-number">2</div>
-                            <div class="step-content">
-                                <div class="step-title">Entrez vos informations</div>
-                                <div class="step-description">Renseignez votre numéro et opérateur Mobile Money</div>
-                            </div>
-                        </div>
-                        <div class="step">
-                            <div class="step-number">3</div>
-                            <div class="step-content">
-                                <div class="step-title">Validez le paiement</div>
-                                <div class="step-description">Confirmez et validez sur votre téléphone</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Bouton de paiement -->
+                <button type="submit" class="pay-button" id="payButton" disabled>
+                    <span class="pay-icon"><i class="fas fa-lock"></i></span>
+                    <span class="pay-text">Payer maintenant</span>
+                    <span class="pay-amount" id="payButtonAmount">0 F</span>
+                </button>
 
                 <!-- Sécurité -->
-                <div class="security-info">
+                <div class="security-badge">
                     <div class="security-icon">
                         <i class="fas fa-shield-alt"></i>
                     </div>
-                    <div class="security-text">
-                        <strong>Paiement 100% sécurisé</strong>
-                        <small>Transaction cryptée et protégée</small>
+                    <div class="security-content">
+                        <strong>Paiement sécurisé par Kkiapay</strong>
+                        <span>PCI DSS compliant • Encryption SSL</span>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="steps-section">
+                    <h4><i class="fas fa-list-ol"></i> Comment ça marche</h4>
+                    <div class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-text">
+                            <strong>Saisissez le montant</strong>
+                            <span>Choisissez un montant rapide ou personnalisé</span>
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-text">
+                            <strong>Validez sur téléphone</strong>
+                            <span>Recevez une notification pour confirmer</span>
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-text">
+                            <strong>Crédit instantané</strong>
+                            <span>Votre wallet est crédité immédiatement</span>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -221,23 +156,41 @@
     </div>
 </div>
 
+<!-- Loading Overlay -->
+<div id="deposit-loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Traitement en cours...</p>
+    <p class="loading-subtext">Veuillez valider sur votre téléphone</p>
+</div>
+
+@if(config('services.kkiapay.sandbox', true))
+<!-- Mode Test -->
+{{-- <div class="sandbox-banner">
+    <i class="fas fa-flask"></i>
+    <div class="sandbox-content">
+        <strong>Mode Test (Sandbox)</strong>
+        <p>Utilisez : <strong>97000000</strong> | OTP: <strong>123456</strong> | Code: <strong>1234</strong></p>
+    </div>
+</div> --}}
+@endif
+
 <style>
-/* Styles spécifiques pour le modal de dépôt */
+/* ===== Modal Slide ===== */
 .slide-modal {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
     z-index: 9999;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
     opacity: 0;
     visibility: hidden;
-    transition: all var(--transition-base);
-    padding: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .slide-modal.show {
@@ -245,57 +198,55 @@
     visibility: visible;
 }
 
-.slide-content {
-    width: 100%;
-    max-width: 500px;
-    background: white;
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-xl);
-    overflow: hidden;
-    animation: slideUp 0.3s ease-out;
+.slide-modal.show .slide-content {
+    transform: translateY(0);
 }
 
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.slide-content {
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    background: #ffffff;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .slide-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1.5rem;
-    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
+    flex-shrink: 0;
 }
 
 .slide-header h3 {
     margin: 0;
     font-size: 1.25rem;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    font-weight: 600;
+    gap: 12px;
 }
 
 .slide-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
     background: rgba(255, 255, 255, 0.2);
     border: none;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 0.2s;
 }
 
 .slide-close:hover {
@@ -304,931 +255,819 @@
 }
 
 .slide-body {
-    padding: 1.5rem;
-    max-height: calc(100vh - 150px);
+    padding: 24px;
     overflow-y: auto;
-}
-
-/* ===== SELECT CUSTOM PROFESSIONNEL ===== */
-.custom-select-container {
-    position: relative;
-    width: 100%;
-}
-
-.custom-select-trigger {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.875rem 1rem;
-    background: white;
-    border: 2px solid var(--secondary-200);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    user-select: none;
-    min-height: 52px;
-}
-
-.custom-select-trigger:hover {
-    border-color: var(--primary-400);
-    background: var(--secondary-50);
-}
-
-.custom-select-trigger.active {
-    border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px var(--primary-100);
-    background: white;
-}
-
-.select-placeholder {
-    color: var(--secondary-500);
-    font-size: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.select-placeholder.has-value {
-    color: var(--secondary-800);
-    font-weight: 500;
-}
-
-.select-placeholder .operator-badge {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 0.9rem;
-}
-
-.select-arrow {
-    color: var(--secondary-500);
-    transition: transform var(--transition-fast);
-    font-size: 0.9rem;
-}
-
-.custom-select-trigger.active .select-arrow {
-    transform: rotate(180deg);
-    color: var(--primary-500);
-}
-
-/* Options menu */
-.custom-select-options {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    background: white;
-    border: 2px solid var(--primary-100);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-lg);
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-10px);
-    transition: all var(--transition-fast);
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.custom-select-options.open {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-/* Options */
-.custom-select-option {
-    padding: 0.5rem;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.custom-select-option:hover {
-    background: var(--secondary-50);
-}
-
-.custom-select-option.selected {
-    background: var(--primary-50);
-}
-
-.option-content {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    border-radius: var(--border-radius-sm);
-}
-
-/* Badges opérateurs */
-.operator-badge {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--border-radius);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1.25rem;
-    flex-shrink: 0;
-}
-
-.operator-badge.orange {
-    background: linear-gradient(135deg, #FF7900 0%, #FFA64D 100%);
-    box-shadow: 0 2px 8px rgba(255, 121, 0, 0.3);
-}
-
-.operator-badge.mtn {
-    background: linear-gradient(135deg, #FFCC00 0%, #FFE066 100%);
-    box-shadow: 0 2px 8px rgba(255, 204, 0, 0.3);
-}
-
-.operator-badge.moov {
-    background: linear-gradient(135deg, #00B050 0%, #66D19E 100%);
-    box-shadow: 0 2px 8px rgba(0, 176, 80, 0.3);
-}
-
-.operator-badge.wave {
-    background: linear-gradient(135deg, #0078D7 0%, #4DA6FF 100%);
-    box-shadow: 0 2px 8px rgba(0, 120, 215, 0.3);
-}
-
-/* Texte des options */
-.option-text {
     flex: 1;
-    min-width: 0;
 }
 
-.option-title {
+/* ===== Form Sections ===== */
+.form-section {
+    margin-bottom: 24px;
+}
+
+.section-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
     font-weight: 600;
-    color: var(--secondary-800);
-    margin-bottom: 0.25rem;
-    font-size: 0.95rem;
+    color: #374151;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-.option-description {
-    font-size: 0.8rem;
-    color: var(--secondary-600);
-    font-weight: 500;
+.section-label i {
+    color: #667eea;
 }
 
-/* Checkmark */
-.option-check {
-    color: var(--primary-500);
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-    flex-shrink: 0;
-    font-size: 0.9rem;
-}
-
-.custom-select-option.selected .option-check {
-    opacity: 1;
-}
-
-/* ===== STYLES EXISTANTS ===== */
-.amount-selector {
+/* ===== Amount Grid ===== */
+.amount-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
+    gap: 12px;
+    margin-bottom: 16px;
 }
 
-.amount-option {
-    background: white;
-    border: 2px solid var(--secondary-300);
-    border-radius: var(--border-radius);
-    padding: 1rem 0.5rem;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--secondary-700);
-    cursor: pointer;
-    transition: all var(--transition-fast);
+.amount-card {
+    background: #f9fafb;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px 8px;
     text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    min-height: 70px;
-    outline: none;
+    gap: 4px;
 }
 
-.amount-option:hover {
-    background: var(--secondary-100);
-    border-color: var(--primary-400);
+.amount-card:hover {
+    border-color: #667eea;
+    background: #eef2ff;
     transform: translateY(-2px);
-    box-shadow: var(--shadow-sm);
 }
 
-.amount-option.selected {
-    background: linear-gradient(135deg, var(--success-500) 0%, var(--success-700) 100%);
-    border-color: var(--success-600);
+.amount-card.selected {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
     color: white;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     transform: translateY(-2px);
 }
 
-.amount-option .amount {
-    font-size: 1.25rem;
+.amount-value {
+    font-size: 1.125rem;
     font-weight: 700;
-    display: block;
-    margin-bottom: 0.25rem;
 }
 
-.amount-option .currency {
-    font-size: 0.9rem;
+.amount-currency {
+    font-size: 0.75rem;
     font-weight: 500;
+    opacity: 0.8;
 }
 
-.mtn-form-group {
-    margin-bottom: 1.5rem;
-}
-
-.mtn-form-label {
-    display: block;
-    font-weight: 600;
-    color: var(--secondary-800);
-    margin-bottom: 0.5rem;
-    font-size: 0.95rem;
+/* ===== Custom Amount ===== */
+.custom-amount-wrapper {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    margin-bottom: 8px;
 }
 
-.mtn-form-control {
-    width: 100%;
-    padding: 0.875rem 1rem;
-    border: 2px solid var(--secondary-200);
-    border-radius: var(--border-radius);
-    font-size: 1rem;
-    transition: all var(--transition-fast);
-    background: white;
-    color: var(--secondary-800);
-}
-
-.mtn-form-control:focus {
-    outline: none;
-    border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px var(--primary-100);
-}
-
-.input-with-icon {
+.input-icon-wrapper {
     position: relative;
+    flex: 1;
 }
 
-.input-with-icon i:first-child {
+.input-icon-wrapper i {
     position: absolute;
-    left: 15px;
+    left: 16px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--secondary-500);
-    z-index: 1;
+    color: #9ca3af;
+    font-size: 1rem;
 }
 
-.input-with-icon input {
-    padding-left: 45px !important;
+.form-input {
     width: 100%;
+    padding: 14px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.2s;
+    background: white;
+    color: #111827;
 }
 
-/* Bouton de confirmation amélioré */
-.confirm-btn {
+.form-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.input-icon-wrapper .form-input {
+    padding-left: 44px;
+}
+
+.input-suffix {
+    position: absolute;
+    right: 16px;
+    color: #6b7280;
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+/* ===== Phone Input ===== */
+.phone-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.phone-input-wrapper:focus-within {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.phone-prefix {
+    background: #f3f4f6;
+    padding: 14px 16px;
+    font-weight: 600;
+    color: #374151;
+    border-right: 2px solid #e5e7eb;
+    font-size: 1rem;
+}
+
+.phone-input {
+    border: none !important;
+    border-radius: 0 !important;
+    flex: 1;
+}
+
+.phone-input:focus {
+    box-shadow: none !important;
+}
+
+/* ===== Summary Card ===== */
+.summary-card {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e5e7eb;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 0.9375rem;
+}
+
+.summary-row span {
+    color: #6b7280;
+}
+
+.summary-row strong {
+    color: #111827;
+    font-weight: 600;
+}
+
+.summary-row.total {
+    font-size: 1.125rem;
+    margin-bottom: 0;
+    padding-top: 12px;
+    border-top: 2px solid #e5e7eb;
+}
+
+.summary-row.total strong {
+    color: #667eea;
+    font-size: 1.25rem;
+}
+
+.text-success {
+    color: #10b981 !important;
+}
+
+.summary-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 12px 0;
+}
+
+/* ===== Pay Button ===== */
+.pay-button {
+    width: 100%;
+    padding: 18px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-size: 1.125rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: 100%;
-    padding: 1rem 1.5rem;
-    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius);
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    overflow: hidden;
-    position: relative;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+    margin-bottom: 20px;
 }
 
-.confirm-btn:hover {
-    background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-800) 100%);
+.pay-button:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
 }
 
-.confirm-btn:active {
+.pay-button:active:not(:disabled) {
     transform: translateY(0);
 }
 
-.confirm-btn i {
-    font-size: 1.2rem;
+.pay-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #9ca3af;
+    box-shadow: none;
 }
 
-.btn-text {
-    flex: 1;
-    text-align: left;
-    padding: 0 1rem;
-}
-
-.btn-amount {
+.pay-icon {
+    width: 40px;
+    height: 40px;
     background: rgba(255, 255, 255, 0.2);
-    padding: 0.5rem 1rem;
-    border-radius: var(--border-radius-sm);
-    font-weight: 700;
-    font-size: 1.2rem;
-    backdrop-filter: blur(10px);
-}
-
-/* Form hints */
-.form-hint {
-    color: var(--secondary-500);
-    font-size: 0.85rem;
-    display: block;
-    margin-top: 8px;
-    padding-left: 5px;
-    line-height: 1.4;
-}
-
-.form-hint i {
-    margin-right: 0.25rem;
-}
-
-/* Process steps */
-.process-steps {
-    margin-top: 2rem;
-    padding: 1.5rem;
-    background: var(--info-50);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--info-200);
-}
-
-.process-steps h5 {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--info-700);
-    margin-bottom: 20px;
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-.steps-container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.step {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 0.75rem;
-    background: white;
-    border-radius: var(--border-radius);
-    border-left: 4px solid var(--info-400);
-}
-
-.step-number {
-    width: 30px;
-    height: 30px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--info-500) 0%, var(--info-700) 100%);
-    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
-    font-size: 0.9rem;
-    flex-shrink: 0;
 }
 
-.step-content {
+.pay-text {
     flex: 1;
+    text-align: center;
 }
 
-.step-title {
-    font-weight: 600;
-    color: var(--secondary-800);
-    font-size: 0.95rem;
-    margin-bottom: 0.25rem;
+.pay-amount {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 1rem;
 }
 
-.step-description {
-    font-size: 0.85rem;
-    color: var(--secondary-600);
-    line-height: 1.4;
-}
-
-/* Security info */
-.security-info {
+/* ===== Security Badge ===== */
+.security-badge {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-top: 1.5rem;
-    padding: 1rem;
-    background: var(--warning-50);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--warning-200);
+    gap: 16px;
+    padding: 16px;
+    background: #fef3c7;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    border: 1px solid #fde68a;
 }
 
 .security-icon {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
+    background: #f59e0b;
     border-radius: 50%;
-    background: var(--warning-100);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--warning-600);
-    font-size: 1.25rem;
+    color: white;
+    font-size: 1.5rem;
     flex-shrink: 0;
 }
 
-.security-text {
+.security-content {
     flex: 1;
 }
 
-.security-text strong {
+.security-content strong {
     display: block;
-    color: var(--warning-700);
-    font-size: 0.95rem;
-    margin-bottom: 0.25rem;
+    color: #92400e;
+    font-size: 0.9375rem;
+    margin-bottom: 4px;
 }
 
-.security-text small {
-    display: block;
-    color: var(--secondary-600);
-    font-size: 0.85rem;
+.security-content span {
+    color: #b45309;
+    font-size: 0.875rem;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
+/* ===== Steps Section ===== */
+.steps-section {
+    background: #eff6ff;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #dbeafe;
+}
+
+.steps-section h4 {
+    margin: 0 0 16px 0;
+    color: #1e40af;
+    font-size: 0.9375rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.step-item:last-child {
+    margin-bottom: 0;
+}
+
+.step-number {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.step-text {
+    flex: 1;
+}
+
+.step-text strong {
+    display: block;
+    color: #1e40af;
+    font-size: 0.9375rem;
+    margin-bottom: 2px;
+}
+
+.step-text span {
+    color: #3b82f6;
+    font-size: 0.875rem;
+}
+
+/* ===== Hint Text ===== */
+.hint-text {
+    margin: 8px 0 0 0;
+    font-size: 0.8125rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hint-text i {
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+/* ===== Loading Overlay ===== */
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(8px);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    z-index: 10000;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 24px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.loading-subtext {
+    font-size: 0.9375rem;
+    opacity: 0.7;
+}
+
+/* ===== Sandbox Banner ===== */
+.sandbox-banner {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    z-index: 10001;
+    max-width: 90%;
+}
+
+.sandbox-banner i {
+    font-size: 1.5rem;
+    color: #d97706;
+}
+
+.sandbox-content strong {
+    display: block;
+    color: #92400e;
+    margin-bottom: 4px;
+}
+
+.sandbox-content p {
+    margin: 0;
+    color: #b45309;
+    font-size: 0.875rem;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 480px) {
     .slide-content {
         max-width: 100%;
-        margin: 0;
-        border-radius: 0;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
+        border-radius: 20px 20px 0 0;
+    }
+
+    .amount-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .slide-body {
-        flex: 1;
-        max-height: none;
-        padding: 1rem;
-    }
-
-    .amount-selector {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.5rem;
-    }
-
-    .amount-option {
-        min-height: 60px;
-        padding: 0.75rem 0.25rem;
-    }
-
-    .confirm-btn {
-        padding: 0.875rem 1rem;
-        font-size: 1rem;
-    }
-
-    .btn-amount {
-        font-size: 1rem;
-        padding: 0.4rem 0.75rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .amount-selector {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .option-content {
-        padding: 0.5rem;
-    }
-
-    .operator-badge {
-        width: 36px;
-        height: 36px;
-        font-size: 1.1rem;
-    }
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-    .custom-select-trigger,
-    .custom-select-options {
-        background: #2d2d2d;
-        border-color: #404040;
-        color: #e0e0e0;
-    }
-
-    .select-placeholder {
-        color: #a0a0a0;
-    }
-
-    .custom-select-option:hover {
-        background: #3d3d3d;
-    }
-
-    .custom-select-option.selected {
-        background: #1e3a8a;
+        padding: 20px;
     }
 }
 </style>
 
+@push('scripts')
+<script src="https://cdn.kkiapay.me/k.js"></script>
 <script>
-// Gestion du modal de dépôt avec select custom
+// Configuration
+const KKIAPAY_CONFIG = {
+    key: '{{ config("services.kkiapay.public_key") }}',
+    sandbox: {{ config("services.kkiapay.sandbox", true) ? 'true' : 'false' }},
+    url: '{{ asset("images/logo.png") }}'
+};
+
+const USER_DATA = {
+    name: '{{ Auth::user()->name }}',
+    email: '{{ Auth::user()->email }}',
+    walletId: {{ $wallet->id }}
+};
+
+// Numéro brut de la base: 2290197899067 → on enlève le préfixe 229
+const RAW_PHONE = '{{ Auth::user()->phone ?? "" }}';
+
+let currentAmount = 0;
+let kkiapayListenersConfigured = false;
+
+// Initialisation
 document.addEventListener('DOMContentLoaded', function() {
     initDepositModal();
+
+    // Nettoyer le numéro au chargement
+    const phoneInput = document.getElementById('paymentPhone');
+    if (phoneInput) {
+        phoneInput.value = cleanPhoneNumber(RAW_PHONE);
+    }
 });
 
-function initDepositModal() {
-    // Variables
-    let currentAmount = 0;
-    let selectedOperator = '';
+/**
+ * Nettoie le numéro de téléphone en retirant les indicatifs
+ */
+function cleanPhoneNumber(phone) {
+    if (!phone) return '';
 
-    // Éléments DOM
-    const amountOptions = document.querySelectorAll('#depositSlide .amount-option');
+    phone = phone.toString().replace(/[\s\-]/g, '');
+
+    if (phone.startsWith('+229')) {
+        phone = phone.substring(4);
+    } else if (phone.startsWith('00229')) {
+        phone = phone.substring(5);
+    } else if (phone.startsWith('229') && phone.length > 10) {
+        phone = phone.substring(3);
+    }
+
+    return phone;
+}
+
+function initDepositModal() {
+    const amountCards = document.querySelectorAll('.amount-card');
     const depositAmountInput = document.getElementById('depositAmount');
     const depositForm = document.getElementById('depositForm');
-    const phoneInput = document.querySelector('#depositSlide input[name="phone_number"]');
-    const confirmBtn = document.querySelector('#depositSlide .confirm-btn');
-    const confirmAmountEl = document.getElementById('confirmAmount');
+    const phoneInput = document.getElementById('paymentPhone');
 
-    // Éléments pour le custom select
-    const operatorTrigger = document.getElementById('operatorTrigger');
-    const operatorOptions = document.getElementById('operatorOptions');
-    const mobileOperatorInput = document.getElementById('mobileOperatorInput');
-    const optionElements = document.querySelectorAll('#depositSlide .custom-select-option');
-    const selectPlaceholder = document.querySelector('.select-placeholder');
+    // Gestion des montants rapides
+    amountCards.forEach(card => {
+        card.addEventListener('click', function() {
+            const amount = parseInt(this.getAttribute('data-amount'));
+            selectAmount(amount, this);
+        });
+    });
 
-    // Initialisation
-    function initialize() {
-        // Sélectionner le premier montant par défaut
-        if (amountOptions.length > 0) {
-            selectAmount(amountOptions[0]);
+    // Gestion du montant personnalisé
+    if (depositAmountInput) {
+        depositAmountInput.addEventListener('input', function() {
+            const amount = parseInt(this.value) || 0;
+            selectAmount(amount, null);
+        });
+
+        depositAmountInput.addEventListener('blur', function() {
+            const amount = parseInt(this.value) || 0;
+            if (amount > 0 && amount < 100) {
+                showToast('warning', 'Montant minimum', 'Le montant minimum est de 100 FCFA');
+                this.value = 100;
+                selectAmount(100, null);
+            }
+        });
+    }
+
+    // Formatage du numéro de téléphone à la saisie
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+            let value = this.value.replace(/\D/g, '');
+            if (value.length > 10) {
+                value = value.substring(0, 10);
+            }
+            this.value = value;
+            updatePayButton();
+        });
+    }
+
+    // Soumission du formulaire
+    if (depositForm) {
+        depositForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!validateForm()) {
+                return;
+            }
+
+            openKkiapayPayment();
+        });
+    }
+}
+
+function selectAmount(amount, selectedCard) {
+    currentAmount = amount;
+
+    document.querySelectorAll('.amount-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+
+    if (selectedCard) {
+        selectedCard.classList.add('selected');
+        const input = document.getElementById('depositAmount');
+        if (input && input.value != amount) {
+            input.value = amount;
         }
-
-        // Gestion des montants
-        amountOptions.forEach(option => {
-            option.addEventListener('click', function() {
-                selectAmount(this);
-            });
-
-            option.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    selectAmount(this);
-                }
-            });
-        });
-
-        // Gestion du montant personnalisé
-        if (depositAmountInput) {
-            depositAmountInput.addEventListener('input', function() {
-                const amount = parseInt(this.value) || 0;
-                currentAmount = amount;
-                updateSelectedAmounts();
-                updateConfirmButton();
-            });
-
-            depositAmountInput.addEventListener('blur', function() {
-                const amount = parseInt(this.value) || 0;
-
-                if (amount < 1000) {
-                    showToast('warning', 'Montant minimum', 'Le montant minimum est de 1 000 FCFA');
-                    this.value = 1000;
-                    currentAmount = 1000;
-                }
-
-                if (currentAmount > 0) {
-                    this.value = new Intl.NumberFormat('fr-FR').format(currentAmount);
-                }
-
-                updateConfirmButton();
-            });
-        }
-
-        // Formatage du numéro de téléphone
-        if (phoneInput) {
-            phoneInput.addEventListener('input', function() {
-                let value = this.value.replace(/\D/g, '');
-                if (value.length > 0) {
-                    value = value.match(/.{1,2}/g).join(' ');
-                }
-                this.value = value.slice(0, 14);
-
-                // Détection automatique de l'opérateur
-                autoDetectOperator(value);
-            });
-        }
-
-        // ===== GESTION DU CUSTOM SELECT =====
-
-        // Ouvrir/fermer le select
-        operatorTrigger.addEventListener('click', function(e) {
-            e.stopPropagation();
-            toggleSelect();
-        });
-
-        // Sélectionner une option
-        optionElements.forEach(option => {
-            option.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const value = this.getAttribute('data-value');
-                const title = this.querySelector('.option-title').textContent;
-                const badgeType = this.querySelector('.operator-badge').className.split(' ')[1];
-
-                selectOperator(value, title, badgeType);
-                closeSelect();
-            });
-        });
-
-        // Fermer le select en cliquant à l'extérieur
-        document.addEventListener('click', function(e) {
-            if (!operatorTrigger.contains(e.target) && !operatorOptions.contains(e.target)) {
-                closeSelect();
-            }
-        });
-
-        // Navigation au clavier
-        operatorTrigger.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                toggleSelect();
-            } else if (e.key === 'Escape') {
-                closeSelect();
-            }
-        });
-
-        // Validation du formulaire
-        function validateForm() {
-            // Validation du montant
-            if (currentAmount < 1000) {
-                showToast('error', 'Montant invalide', 'Le montant minimum est de 1 000 FCFA');
-                depositAmountInput?.focus();
-                return false;
-            }
-
-            // Validation du numéro de téléphone
-            const phoneNumber = phoneInput?.value || '';
-
-            if (!phoneNumber || phoneNumber.replace(/\s/g, '').length < 10) {
-                showToast('error', 'Numéro invalide', 'Veuillez entrer un numéro de téléphone valide (10 chiffres)');
-                phoneInput?.focus();
-                return false;
-            }
-
-            // Validation de l'opérateur
-            if (!selectedOperator) {
-                showToast('error', 'Opérateur manquant', 'Veuillez sélectionner votre opérateur Mobile Money');
-                operatorTrigger.focus();
-                return false;
-            }
-
-            return true;
-        }
-
-        // Soumission du formulaire
-        if (depositForm) {
-            depositForm.addEventListener('submit', async function(e) {
-                e.preventDefault();
-
-                if (!validateForm()) {
-                    return;
-                }
-
-                // Préparation des données
-                const formData = new FormData(this);
-                const data = {
-                    amount: currentAmount,
-                    payment_method: 'mobile_money',
-                    phone_number: formData.get('phone_number'),
-                    mobile_operator: selectedOperator,
-                    _token: '{{ csrf_token() }}'
-                };
-
-                // État de chargement
-                const originalText = confirmBtn.innerHTML;
-                confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span class="btn-text">Traitement en cours...</span>';
-                confirmBtn.disabled = true;
-
-                try {
-                    const response = await fetch('{{ route("client.wallet.deposit") }}', {
-                        method: 'POST',
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': data._token
-                        },
-                        body: JSON.stringify(data)
-                    });
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        showToast('success', 'Dépôt initié',
-                            `Votre dépôt de ${new Intl.NumberFormat('fr-FR').format(currentAmount)} F est en cours`);
-
-                        setTimeout(() => {
-                            closeSlide('depositSlide');
-                            resetForm();
-                            if (typeof refreshBalance === 'function') {
-                                refreshBalance();
-                            }
-                        }, 2000);
-
-                    } else {
-                        throw new Error(result.message || 'Erreur lors du dépôt');
-                    }
-
-                } catch (error) {
-                    console.error('Erreur:', error);
-                    showToast('error', 'Erreur', error.message);
-
-                    // Restaurer le bouton
-                    confirmBtn.innerHTML = originalText;
-                    confirmBtn.disabled = false;
-                }
-            });
+    } else {
+        const matchingCard = document.querySelector(`.amount-card[data-amount="${amount}"]`);
+        if (matchingCard) {
+            matchingCard.classList.add('selected');
         }
     }
 
-    // ===== FONCTIONS CUSTOM SELECT =====
+    updateSummary();
+    updatePayButton();
+}
 
-    function toggleSelect() {
-        operatorOptions.classList.toggle('open');
-        operatorTrigger.classList.toggle('active');
+function updateSummary() {
+    const summaryCard = document.getElementById('summaryCard');
+    const summaryAmount = document.getElementById('summaryAmount');
+    const summaryTotal = document.getElementById('summaryTotal');
+    const payButtonAmount = document.getElementById('payButtonAmount');
 
-        if (operatorOptions.classList.contains('open')) {
-            operatorTrigger.setAttribute('aria-expanded', 'true');
+    if (currentAmount >= 100) {
+        summaryCard.style.display = 'block';
+        const formatted = new Intl.NumberFormat('fr-FR').format(currentAmount) + ' FCFA';
+        summaryAmount.textContent = formatted;
+        summaryTotal.textContent = formatted;
+        payButtonAmount.textContent = new Intl.NumberFormat('fr-FR').format(currentAmount) + ' F';
+    } else {
+        summaryCard.style.display = 'none';
+        payButtonAmount.textContent = '0 F';
+    }
+}
+
+function updatePayButton() {
+    const phoneInput = document.getElementById('paymentPhone');
+    const payButton = document.getElementById('payButton');
+    const phone = phoneInput ? phoneInput.value.replace(/\s/g, '') : '';
+
+    const isValid = currentAmount >= 100 && phone.length >= 8;
+    payButton.disabled = !isValid;
+}
+
+function validateForm() {
+    const phoneInput = document.getElementById('paymentPhone');
+    const phone = phoneInput ? phoneInput.value.replace(/\s/g, '') : '';
+
+    if (currentAmount < 100) {
+        showToast('error', 'Montant invalide', 'Le montant minimum est de 100 FCFA');
+        document.getElementById('depositAmount').focus();
+        return false;
+    }
+
+    if (phone.length < 8) {
+        showToast('error', 'Numéro invalide', 'Veuillez saisir un numéro de téléphone valide');
+        phoneInput.focus();
+        return false;
+    }
+
+    return true;
+}
+
+function openKkiapayPayment() {
+    if (typeof openKkiapayWidget !== 'function') {
+        showToast('error', 'Erreur', 'Le service de paiement n\'est pas chargé. Veuillez rafraîchir la page.');
+        return;
+    }
+
+    const phoneInput = document.getElementById('paymentPhone');
+    let phoneNumber = phoneInput.value.replace(/\s/g, '');
+    phoneNumber = cleanPhoneNumber(phoneNumber);
+
+    console.log('Numéro original:', phoneInput.value);
+    console.log('Numéro nettoyé:', phoneNumber);
+
+    const config = {
+        amount: parseInt(currentAmount),
+        key: KKIAPAY_CONFIG.key,
+        url: KKIAPAY_CONFIG.url,
+        position: 'center',
+        sandbox: KKIAPAY_CONFIG.sandbox,
+        phone: phoneNumber,
+        name: USER_DATA.name,
+        email: USER_DATA.email,
+        callback: '{{ url("/kkiapay/callback") }}',
+        data: JSON.stringify({
+            wallet_id: USER_DATA.walletId,
+            amount: currentAmount,
+            type: 'deposit',
+            phone: phoneNumber,
+            timestamp: Date.now()
+        })
+    };
+
+    console.log('Configuration Kkiapay:', config);
+
+    if (!kkiapayListenersConfigured) {
+        setupKkiapayListeners();
+        kkiapayListenersConfigured = true;
+    }
+
+    try {
+        openKkiapayWidget(config);
+    } catch (error) {
+        console.error('Erreur ouverture Kkiapay:', error);
+        showToast('error', 'Erreur', 'Impossible d\'ouvrir le paiement');
+    }
+}
+
+function setupKkiapayListeners() {
+    if (typeof addSuccessListener === 'function') {
+        addSuccessListener(function(response) {
+            console.log('Paiement réussi:', response);
+            handlePaymentSuccess(response);
+        });
+    }
+
+    if (typeof addFailedListener === 'function') {
+        addFailedListener(function(response) {
+            console.log('Paiement échoué:', response);
+            showToast('error', 'Paiement échoué', response.message || 'Le paiement a été refusé');
+            hideLoading();
+        });
+    }
+
+    if (typeof addPendingListener === 'function') {
+        addPendingListener(function(response) {
+            console.log('Paiement en attente:', response);
+            showLoading('Validation en attente...', 'Veuillez confirmer sur votre téléphone');
+        });
+    }
+
+    if (typeof addKkiapayCloseListener === 'function') {
+        addKkiapayCloseListener(function() {
+            console.log('Widget fermé');
+            hideLoading();
+        });
+    }
+}
+
+async function handlePaymentSuccess(kkiapayResponse) {
+    showLoading('Traitement en cours...', 'Ne fermez pas cette page');
+
+    try {
+        let additionalData = {};
+        try {
+            additionalData = JSON.parse(kkiapayResponse.data || '{}');
+        } catch(e) {
+            console.warn('Parse data error:', e);
+        }
+
+        const returnedPhone = cleanPhoneNumber(kkiapayResponse.phone || additionalData.phone || '');
+        const walletId = parseInt(additionalData.wallet_id) || USER_DATA.walletId;
+
+        const payload = {
+            transaction_id: kkiapayResponse.transactionId,
+            status: 'success',
+            amount: parseInt(currentAmount),
+            phone: returnedPhone,
+            wallet_id: walletId,
+            kkiapay_data: kkiapayResponse
+        };
+
+        console.log('Envoi au serveur:', payload);
+
+        // URL CORRIGÉE - Route publique sans /client/
+        const response = await fetch('/wallet/deposit/callback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        console.log('Response status:', response.status);
+
+        const responseText = await response.text();
+        console.log('Response text:', responseText);
+
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch {
+            throw new Error('Réponse serveur invalide: ' + responseText.substring(0, 200));
+        }
+
+        if (!response.ok) {
+            throw new Error(result.message || `Erreur HTTP ${response.status}`);
+        }
+
+        if (result.success) {
+            showToast('success', 'Dépôt réussi !',
+                'Votre compte a été crédité de ' + new Intl.NumberFormat('fr-FR').format(currentAmount) + ' FCFA');
+
+            closeSlide('depositSlide');
+            setTimeout(() => window.location.reload(), 2000);
         } else {
-            operatorTrigger.setAttribute('aria-expanded', 'false');
-        }
-    }
-
-    function openSelect() {
-        operatorOptions.classList.add('open');
-        operatorTrigger.classList.add('active');
-        operatorTrigger.setAttribute('aria-expanded', 'true');
-    }
-
-    function closeSelect() {
-        operatorOptions.classList.remove('open');
-        operatorTrigger.classList.remove('active');
-        operatorTrigger.setAttribute('aria-expanded', 'false');
-    }
-
-    function selectOperator(value, title, badgeType) {
-        selectedOperator = value;
-        mobileOperatorInput.value = value;
-
-        // Mettre à jour l'affichage du trigger
-        selectPlaceholder.textContent = title;
-        selectPlaceholder.classList.add('has-value');
-
-        // Ajouter le badge au trigger
-        const existingBadge = selectPlaceholder.querySelector('.operator-badge');
-        if (existingBadge) {
-            existingBadge.remove();
+            showToast('warning', 'Attention', result.message);
+            hideLoading();
         }
 
-        const badge = document.createElement('div');
-        badge.className = `operator-badge ${badgeType}`;
-        badge.innerHTML = `<i class="fas fa-${getOperatorIcon(value)}"></i>`;
-        selectPlaceholder.insertBefore(badge, selectPlaceholder.firstChild);
-
-        // Mettre à jour la sélection visuelle
-        optionElements.forEach(option => {
-            option.classList.remove('selected');
-            if (option.getAttribute('data-value') === value) {
-                option.classList.add('selected');
-            }
-        });
+    } catch (error) {
+        console.error('Erreur complète:', error);
+        showToast('error', 'Erreur', error.message);
+        hideLoading();
     }
+}
 
-    function getOperatorIcon(operator) {
-        switch(operator) {
-            case 'orange': return 'fire';
-            case 'mtn': return 'bolt';
-            case 'moov': return 'leaf';
-            case 'wave': return 'water';
-            default: return 'sim-card';
-        }
+function showLoading(text, subtext) {
+    const overlay = document.getElementById('deposit-loading');
+    if (overlay) {
+        overlay.querySelector('.loading-text').textContent = text || 'Traitement en cours...';
+        overlay.querySelector('.loading-subtext').textContent = subtext || 'Veuillez patienter';
+        overlay.classList.add('active');
     }
+}
 
-    function autoDetectOperator(phoneNumber) {
-        const cleanNumber = phoneNumber.replace(/\s/g, '');
-
-        if (cleanNumber.length >= 2) {
-            const prefix = cleanNumber.substring(0, 2);
-            let operator = '';
-            let title = '';
-
-            if (['07', '05', '04'].includes(prefix)) {
-                operator = 'orange';
-                title = 'Orange Money';
-            } else if (['06', '05'].includes(prefix)) {
-                operator = 'mtn';
-                title = 'MTN Mobile Money';
-            } else if (['01', '02'].includes(prefix)) {
-                operator = 'moov';
-                title = 'Moov Money';
-            } else if (['09'].includes(prefix)) {
-                operator = 'wave';
-                title = 'Wave';
-            }
-
-            if (operator && !selectedOperator) {
-                selectOperator(operator, title, operator);
-            }
-        }
+function hideLoading() {
+    const overlay = document.getElementById('deposit-loading');
+    if (overlay) {
+        overlay.classList.remove('active');
     }
-
-    // ===== FONCTIONS EXISTANTES =====
-
-    function selectAmount(option) {
-        const amount = parseInt(option.getAttribute('data-amount'));
-        currentAmount = amount;
-
-        if (depositAmountInput) {
-            depositAmountInput.value = amount;
-        }
-
-        updateSelectedAmounts();
-        updateConfirmButton();
-    }
-
-    function updateSelectedAmounts() {
-        amountOptions.forEach(option => {
-            const amount = parseInt(option.getAttribute('data-amount'));
-            if (amount === currentAmount) {
-                option.classList.add('selected');
-                option.setAttribute('aria-selected', 'true');
-            } else {
-                option.classList.remove('selected');
-                option.setAttribute('aria-selected', 'false');
-            }
-        });
-    }
-
-    function updateConfirmButton() {
-        if (confirmAmountEl) {
-            confirmAmountEl.textContent = new Intl.NumberFormat('fr-FR').format(currentAmount) + ' F';
-        }
-    }
-
-    function resetForm() {
-        currentAmount = 0;
-        selectedOperator = '';
-
-        if (depositAmountInput) depositAmountInput.value = '';
-        if (phoneInput) phoneInput.value = '';
-        if (mobileOperatorInput) mobileOperatorInput.value = '';
-
-        // Réinitialiser le select custom
-        selectPlaceholder.textContent = 'Choisir votre opérateur';
-        selectPlaceholder.classList.remove('has-value');
-        const existingBadge = selectPlaceholder.querySelector('.operator-badge');
-        if (existingBadge) existingBadge.remove();
-
-        // Réinitialiser les options
-        optionElements.forEach(option => {
-            option.classList.remove('selected');
-        });
-
-        // Réinitialiser les montants
-        amountOptions.forEach(option => {
-            option.classList.remove('selected');
-            option.setAttribute('aria-selected', 'false');
-        });
-
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.innerHTML = '<i class="fas fa-mobile-alt"></i> <span class="btn-text">Confirmer le dépôt</span> <span class="btn-amount" id="confirmAmount">0 F</span>';
-        }
-
-        updateConfirmButton();
-    }
-
-    function showToast(type, title, message) {
-        if (window.toast) {
-            switch(type) {
-                case 'error': window.toast.error(title, message); break;
-                case 'warning': window.toast.warning(title, message); break;
-                case 'success': window.toast.success(title, message); break;
-                default: window.toast.info(title, message);
-            }
-        } else {
-            console.log(`${type}: ${title} - ${message}`);
-        }
-    }
-
-    // Initialiser
-    initialize();
 }
 
 function showDepositModal() {
@@ -1239,8 +1078,11 @@ function showDepositModal() {
 
         setTimeout(() => {
             const amountInput = document.getElementById('depositAmount');
-            if (amountInput) amountInput.focus();
-        }, 300);
+            if (amountInput && !amountInput.value) {
+                const firstCard = document.querySelector('.amount-card');
+                if (firstCard) firstCard.click();
+            }
+        }, 100);
     }
 }
 
@@ -1249,6 +1091,23 @@ function closeSlide(id) {
     if (modal) {
         modal.classList.remove('show');
         document.body.style.overflow = 'auto';
+        hideLoading();
+    }
+}
+
+function showToast(type, title, message) {
+    if (window.toast && typeof window.toast[type] === 'function') {
+        window.toast[type](title, message);
+    } else if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            icon: type === 'error' ? 'error' : type === 'success' ? 'success' : 'info',
+            title: title,
+            text: message,
+            timer: type === 'success' ? 3000 : undefined
+        });
+    } else {
+        alert(`${title}: ${message}`);
     }
 }
 </script>
+@endpush
