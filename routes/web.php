@@ -20,10 +20,11 @@ use App\Http\Controllers\Client\DocumentController as ClientDocumentController;
 use App\Http\Controllers\Client\ProfileController;
 use App\Http\Controllers\Client\RequestFundingController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\Client\ClientWalletController as ClientWalletController; // SEUL import pour le wallet client
 use App\Http\Controllers\PwaController;
 use App\Http\Controllers\SSEController;
 use App\Http\Controllers\TrainingController;
-use App\Http\Controllers\WalletController;
+use App\Http\Controllers\PaymentCallbackController; // Contrôleur principal (API/callbacks)
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -199,7 +200,7 @@ Route::get('/service-worker.js', function () {
     ]);
 })->name('service-worker');
 
-Route::get('/funding/check-updates', [WalletController::class, 'checkFundingUpdates'])
+Route::get('/funding/check-updates', [ClientWalletController::class, 'checkFundingUpdates'])
     ->name('funding.check-updates')
     ->middleware(['auth', 'verified']);
 
@@ -210,24 +211,24 @@ Route::get('/funding/check-updates', [WalletController::class, 'checkFundingUpda
 */
 
 // CALLBACK PRINCIPAL KKIAPAY - Doit être accessible publiquement
-Route::match(['get', 'post'], '/kkiapay/callback', [WalletController::class, 'kkiapayCallback'])
+Route::match(['get', 'post'], '/kkiapay/callback', [PaymentCallbackController::class, 'kkiapayCallback'])
     ->name('kkiapay.callback')
     ->withoutMiddleware(['auth', 'verified', \App\Http\Middleware\VerifyCsrfToken::class]);
 
 // CALLBACK ALTERNATIF pour dépôt wallet
-Route::post('/wallet/deposit/callback', [WalletController::class, 'kkiapayCallback'])
+Route::post('/wallet/deposit/callback', [PaymentCallbackController::class, 'kkiapayCallback'])
     ->name('client.wallet.deposit.callback')
     ->withoutMiddleware(['auth', 'verified', \App\Http\Middleware\VerifyCsrfToken::class]);
 
 // Routes de paiement (protégées par auth)
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/payment/success/{transaction}', [WalletController::class, 'paymentSuccess'])
+    Route::get('/payment/success/{transaction}', [PaymentCallbackController::class, 'paymentSuccess'])
         ->name('payment.success');
-    Route::get('/payment/failed/{transaction}', [WalletController::class, 'paymentFailed'])
+    Route::get('/payment/failed/{transaction}', [PaymentCallbackController::class, 'paymentFailed'])
         ->name('payment.failed');
-    Route::get('/payment/error', [WalletController::class, 'paymentError'])
+    Route::get('/payment/error', [PaymentCallbackController::class, 'paymentError'])
         ->name('payment.error');
-    Route::get('/payment/status/{transaction}', [WalletController::class, 'paymentStatus'])
+    Route::get('/payment/status/{transaction}', [PaymentCallbackController::class, 'paymentStatus'])
         ->name('payment.status');
 });
 
@@ -275,18 +276,18 @@ Route::middleware(['auth', 'verified'])->prefix('client')->name('client.')->grou
     // Wallet Routes (sans le callback qui est public)
     Route::prefix('wallet')->name('wallet.')->middleware('profile.documents.validated')->group(function () {
 
-        Route::get('/', [WalletController::class, 'wallet'])->name('index');
-        Route::get('/transactions', [WalletController::class, 'transactions'])->name('transactions');
-        Route::post('/deposit', [WalletController::class, 'deposit'])->name('deposit');
-        Route::post('/withdraw', [WalletController::class, 'withdraw'])->name('withdraw');
-        Route::post('/transfer', [WalletController::class, 'transfer'])->name('transfer');
-        Route::post('/set-pin', [WalletController::class, 'setPin'])->name('set-pin');
-        Route::post('/verify-pin', [WalletController::class, 'verifyPin'])->name('verify-pin');
-        Route::get('/get-info', [WalletController::class, 'getWalletInfo'])->name('get-info');
-        Route::get('/check-funding-updates', [WalletController::class, 'checkFundingUpdates'])->name('funding.check');
-        Route::get('/funding/{id}/details', [WalletController::class, 'fundingDetails'])->name('funding.details');
-        Route::post('/funding/{id}/credit', [WalletController::class, 'creditFunding'])->name('funding.credit');
-        Route::get('/quick-actions', [WalletController::class, 'getQuickActions'])->name('quick-actions');
+        Route::get('/', [ClientWalletController::class, 'wallet'])->name('index');
+        Route::get('/transactions', [ClientWalletController::class, 'transactions'])->name('transactions');
+        Route::post('/deposit', [ClientWalletController::class, 'deposit'])->name('deposit');
+        Route::post('/withdraw', [ClientWalletController::class, 'withdraw'])->name('withdraw');
+        Route::post('/transfer', [ClientWalletController::class, 'transfer'])->name('transfer');
+        Route::post('/set-pin', [ClientWalletController::class, 'setPin'])->name('set-pin');
+        Route::post('/verify-pin', [ClientWalletController::class, 'verifyPin'])->name('verify-pin');
+        Route::get('/get-info', [ClientWalletController::class, 'getWalletInfo'])->name('get-info');
+        Route::get('/check-funding-updates', [ClientWalletController::class, 'checkFundingUpdates'])->name('funding.check');
+        Route::get('/funding/{id}/details', [ClientWalletController::class, 'fundingDetails'])->name('funding.details');
+        Route::post('/funding/{id}/credit', [ClientWalletController::class, 'creditFunding'])->name('funding.credit');
+        Route::get('/quick-actions', [ClientWalletController::class, 'getQuickActions'])->name('quick-actions');
     });
 
     // User Profile
@@ -499,9 +500,7 @@ Route::prefix('api')->name('api.')->group(function () {
         Route::get('/user', function (Request $request) {
             return $request->user();
         });
-        Route::get('/wallet/balance', [ApiWalletController::class, 'balance']);
-        Route::post('/wallet/deposit', [ApiWalletController::class, 'deposit']);
-        Route::post('/wallet/withdraw', [ApiWalletController::class, 'withdraw']);
+
     });
 });
 

@@ -500,7 +500,7 @@
     .wallet-header { padding: 1rem; }
     .wallet-title h1 { font-size: 1.25rem; }
     .balance-amount h2 { font-size: 2.5rem; }
-    
+
     .floating-actions-top {
         position: fixed;
         bottom: 5rem;
@@ -509,26 +509,26 @@
         flex-direction: row;
         gap: 0.5rem;
     }
-    
+
     .floating-action-btn {
         width: 48px;
         height: 48px;
         font-size: 1.1rem;
     }
-    
+
     .balance-actions {
         flex-direction: column;
     }
-    
+
     .main-action-btn {
         width: 100%;
     }
-    
+
     .funding-item {
         flex-direction: column;
         align-items: flex-start;
     }
-    
+
     .funding-btn {
         width: 100%;
         justify-content: center;
@@ -550,13 +550,13 @@
         <button class="floating-action-btn deposit" onclick="showDepositModal()" title="Déposer">
             <i class="fas fa-plus"></i>
         </button>
-        
+
         @if(($wallet->balance ?? 0) >= 1000)
         <button class="floating-action-btn withdraw" onclick="showWithdrawModal()" title="Retirer">
             <i class="fas fa-minus"></i>
         </button>
         @endif
-        
+
         <button class="floating-action-btn pin" onclick="showPinModal()" title="Changer PIN">
             <i class="fas fa-key"></i>
         </button>
@@ -584,27 +584,27 @@
         <div class="balance-label">
             <i class="fas fa-wallet"></i> Solde disponible
         </div>
-        
+
         <div class="balance-amount">
             <h2 id="walletBalance">{{ number_format($wallet->balance ?? 0, 0, ',', ' ') }}</h2>
             <div class="balance-currency">Francs CFA</div>
         </div>
-        
+
         <div class="balance-subtitle">
             <i class="fas fa-check-circle" style="color: var(--success-500);"></i> Solde à jour
         </div>
-        
+
         <div class="balance-actions">
             <button class="main-action-btn deposit" onclick="showDepositModal()">
                 <i class="fas fa-plus-circle"></i> Déposer
             </button>
-            
+
             @if(($wallet->balance ?? 0) >= 1000)
             <button class="main-action-btn withdraw" onclick="showWithdrawModal()">
                 <i class="fas fa-minus-circle"></i> Retirer
             </button>
             @endif
-            
+
             <button class="main-action-btn pin" onclick="showPinModal()">
                 <i class="fas fa-key"></i> PIN
             </button>
@@ -618,7 +618,7 @@
             <h3><i class="fas fa-clock"></i> Financements en attente</h3>
             <span class="section-badge">{{ $pendingFundings->count() }}</span>
         </div>
-        
+
         <div class="funding-list">
             @foreach($pendingFundings as $funding)
             <div class="funding-item" onclick="showFundingDetails({{ $funding->id }})">
@@ -657,7 +657,7 @@
         <div class="section-header">
             <h3><i class="fas fa-chart-bar"></i> Ce mois</h3>
         </div>
-        
+
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
@@ -688,7 +688,7 @@
             </a>
             @endif
         </div>
-        
+
         @if(isset($transactions) && $transactions->count() > 0)
         <div class="transactions-list">
             @foreach($transactions->take(5) as $transaction)
@@ -742,9 +742,8 @@
 
 @push('scripts')
 <script>
-// Variables globales
-let walletBalance = {{ $wallet->balance ?? 0 }};
-let refreshInterval;
+// Variable globale UNIQUE - pas de "let" ou "const" ici
+window.walletBalance = {{ $wallet->balance ?? 0 }};
 
 // Fonctions globales
 window.showDepositModal = function() {
@@ -752,11 +751,11 @@ window.showDepositModal = function() {
         showToast('Connexion requise', 'error');
         return;
     }
-    const modal = document.getElementById('depositSlide');
-    if (modal) {
-        modal.classList.add('show');
-        document.body.style.overflow = 'hidden';
-        initDepositForm();
+    if (typeof window.DepositModal !== 'undefined') {
+        window.DepositModal.open();
+    } else {
+        console.error('DepositModal non chargé');
+        showToast('Erreur de chargement du modal', 'error');
     }
 };
 
@@ -765,11 +764,10 @@ window.showWithdrawModal = function() {
         showToast('Connexion requise', 'error');
         return;
     }
-    if (walletBalance < 1000) {
+    if (window.walletBalance < 1000) {
         showToast('Solde insuffisant (min: 1000 F)', 'error');
         return;
     }
-    // Vérifier PIN d'abord...
     const modal = document.getElementById('withdrawSlide');
     if (modal) {
         modal.classList.add('show');
@@ -794,14 +792,14 @@ window.closeSlide = function(id) {
 };
 
 // Toast notification
-function showToast(message, type = 'success') {
+window.showToast = function(message, type = 'success') {
     const existing = document.querySelector('.toast-notification');
     if (existing) existing.remove();
-    
+
     const toast = document.createElement('div');
     toast.className = `toast-notification toast-${type}`;
     const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle' };
-    
+
     toast.innerHTML = `<i class="fas ${icons[type]}"></i><span>${message}</span>`;
     toast.style.cssText = `
         position: fixed;
@@ -818,13 +816,13 @@ function showToast(message, type = 'success') {
         font-weight: 500;
         animation: slideIn 0.3s ease;
     `;
-    
+
     document.body.appendChild(toast);
     setTimeout(() => {
         toast.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => toast.remove(), 300);
     }, 3000);
-}
+};
 
 // Initialisation
 document.addEventListener('DOMContentLoaded', function() {
@@ -835,14 +833,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (modal) closeSlide(modal.id);
         });
     });
-    
+
     // Fermer au clic extérieur
     document.querySelectorAll('.slide-modal, .modal-overlay').forEach(modal => {
         modal.addEventListener('click', function(e) {
             if (e.target === this) closeSlide(this.id);
         });
     });
-    
+
     // Touche Escape
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
@@ -851,47 +849,49 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
-    
-    // Refresh auto
-    setInterval(() => {
-        if (navigator.onLine) refreshBalance();
-    }, 60000);
+
+    // Refresh auto seulement si en ligne
+    if (navigator.onLine) {
+        setInterval(() => {
+            refreshBalance();
+        }, 60000);
+    }
 });
 
-async function refreshBalance() {
+window.refreshBalance = async function() {
     try {
         const response = await fetch('{{ route("client.wallet.get-info") }}', {
-            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+            }
         });
+
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+
         const data = await response.json();
         if (data.success) {
-            walletBalance = data.wallet.balance;
-            document.getElementById('walletBalance').textContent = 
-                new Intl.NumberFormat('fr-FR').format(walletBalance);
+            window.walletBalance = data.wallet.balance;
+            const balanceEl = document.getElementById('walletBalance');
+            if (balanceEl) {
+                balanceEl.textContent = new Intl.NumberFormat('fr-FR').format(window.walletBalance);
+            }
             updateButtons();
         }
     } catch (e) {
         console.error('Refresh error:', e);
     }
-}
+};
 
-function updateButtons() {
+window.updateButtons = function() {
     const withdrawBtns = document.querySelectorAll('.main-action-btn.withdraw, .floating-action-btn.withdraw');
     withdrawBtns.forEach(btn => {
-        btn.style.display = walletBalance >= 1000 ? 'flex' : 'none';
+        btn.style.display = window.walletBalance >= 1000 ? 'flex' : 'none';
     });
-}
-
-function initDepositForm() {
-    // Réinitialiser le formulaire
-    const form = document.getElementById('depositForm');
-    if (form) form.reset();
-    
-    // Reset montants
-    document.querySelectorAll('.amount-card').forEach(c => c.classList.remove('selected'));
-    document.getElementById('summaryCard') && (document.getElementById('summaryCard').style.display = 'none');
-    document.getElementById('payButton') && (document.getElementById('payButton').disabled = true);
-}
+};
 
 // CSS animations
 const style = document.createElement('style');

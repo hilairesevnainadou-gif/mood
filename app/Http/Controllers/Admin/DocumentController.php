@@ -14,265 +14,334 @@ use Illuminate\Support\Facades\Log;
 
 class DocumentController extends Controller
 {
-    /**
-     * Cache duration in seconds
-     */
     protected const CACHE_DURATION = 300; // 5 minutes
 
     /**
-     * Index groupé par utilisateur - OPTIMISÉ
+     * Index - VERSION ULTRA OPTIMISÉE
      */
     public function index(Request $request)
     {
-        // Requête de base optimisée avec sélection minimale
-        $query = User::select(['id', 'name', 'email', 'member_type', 'is_verified', 'created_at'])
-            ->with(['documents' => function($q) {
-                $q->select([
-                    'id', 'user_id', 'name', 'type', 'status',
-                    'created_at', 'path', 'original_filename'
-                ])
-                ->orderBy('status', 'asc')
-                ->orderBy('created_at', 'desc')
-                ->limit(50);
-            }])
-            ->whereHas('documents');
+        // Désactiver le query log pour économiser de la mémoire sur les grosses requêtes
+        DB::disableQueryLog();
 
-        // Filtres optimisés
-        if ($request->filter === 'pending') {
-            $query->whereExists(function ($subQuery) {
-                $subQuery->select(DB::raw(1))
-                    ->from('documents')
-                    ->whereColumn('documents.user_id', 'users.id')
-                    ->where('status', 'pending');
-            });
-        } elseif ($request->filter === 'complete') {
-            $query->where('is_verified', true);
-        } elseif ($request->filter === 'unverified') {
-            $query->where('is_verified', false)
-                  ->whereExists(function ($subQuery) {
-                      $subQuery->select(DB::raw(1))
-                          ->from('documents')
-                          ->whereColumn('documents.user_id', 'users.id');
-                  });
-        }
+        $cacheKey = "documents_index_{$request->filter}_{$request->page}";
 
-        $users = $query->paginate(10);
+        $data = Cache::remember($cacheKey, 60, function () use ($request) {
+            $query = User::select(['id', 'name', 'email', 'member_type', 'is_verified', 'created_at'])
+                ->with(['documents' => function($q) {
+                    $q->select(['id', 'user_id', 'name', 'type', 'status', 'created_at', 'path', 'original_filename'])
+                      ->orderBy('status', 'asc')
+                      ->orderBy('created_at', 'desc')
+                      ->limit(20); // Réduit de 50 à 20
+                }])
+                ->whereHas('documents', function($q) {
+                    $q->where('is_profile_document', true);
+                });
 
-        // Stats en cache
-        $stats = Cache::remember('document_stats', self::CACHE_DURATION, function () {
+            // Filtres simplifiés sans sous-requêtes complexes
+            if ($request->filter === 'pending') {
+                $pendingUserIds = Document::where('status', 'pending')
+                    ->where('is_profile_document', true)
+                    ->distinct()
+                    ->pluck('user_id');
+                $query->whereIn('id', $pendingUserIds);
+            }
+            elseif ($request->filter === 'complete') {
+                $query->where('is_verified', true);
+            }
+            elseif ($request->filter === 'unverified') {
+                $query->where('is_verified', false);
+            }
+
             return [
-                'total_users' => User::whereExists(function ($q) {
-                    $q->select(DB::raw(1))->from('documents')
-                        ->whereColumn('documents.user_id', 'users.id');
-                })->count(),
+                'users' => $query->paginate(10),
+                'stats' => $this->getQuickStats()
+            ];
+        });
+
+        return view('admin.documents.index', $data);
+    }
+
+    /**
+     * Stats rapides sans transaction complexe
+     */
+    private function getQuickStats()
+    {
+        return Cache::remember('doc_stats_v2', self::CACHE_DURATION, function () {
+            return [
+                'total_users' => User::whereHas('documents')->count(),
                 'pending' => Document::where('status', 'pending')->count(),
                 'validated' => Document::where('status', 'validated')->count(),
                 'rejected' => Document::where('status', 'rejected')->count(),
                 'verified_users' => User::where('is_verified', true)->count(),
             ];
         });
-
-        return view('admin.documents.index', compact('users', 'stats'));
     }
 
     /**
-     * Show : documents d'un utilisateur spécifique
+     * Show - VERSION OPTIMISÉE
      */
     public function show($userId)
     {
-        $user = User::select(['id', 'name', 'email', 'member_type', 'is_verified'])->findOrFail($userId);
+        $user = User::select(['id', 'name', 'email', 'member_type', 'is_verified'])
+            ->findOrFail($userId);
 
+        // Documents avec pagination mémoire au lieu de get()
         $documents = Document::where('user_id', $userId)
-            ->select([
-                'id', 'user_id', 'name', 'type', 'category', 'status',
-                'path', 'original_filename', 'size', 'mime_type',
-                'validated_at', 'validated_by', 'rejection_reason',
-                'expiry_date', 'is_expired', 'created_at'
-            ])
+            ->select(['id', 'user_id', 'name', 'type', 'category', 'status', 'path',
+                     'original_filename', 'size', 'mime_type', 'validated_at',
+                     'validated_by', 'rejection_reason', 'expiry_date', 'is_expired', 'created_at'])
             ->orderByRaw("FIELD(status, 'pending', 'validated', 'rejected')")
             ->orderBy('created_at', 'desc')
+            ->limit(100) // Limite de sécurité
             ->get();
 
-        // Récupérer les documents requis pour ce type de membre
-        $requiredDocs = RequiredDocument::getByMemberType($user->member_type, true);
+        // Cache des documents requis pour TOUS les appels
+        $requiredDocs = $this->getCachedRequiredDocs($user->member_type);
         $requiredTypes = $requiredDocs->pluck('document_type')->toArray();
 
-        // Vérifier si tous les documents requis sont validés
-        $validationStatus = $this->checkUserDocumentsValidation($userId, $requiredTypes);
+        // Vérification optimisée en une requête
+        $validationStatus = $this->fastValidationCheck($userId, $requiredTypes);
 
         return view('admin.documents.show', compact('user', 'documents', 'requiredDocs', 'validationStatus'));
     }
 
     /**
-     * Validation individuelle avec vérification complète
+     * Cache centralisé des documents requis
+     */
+    private function getCachedRequiredDocs($memberType)
+    {
+        return Cache::remember("req_docs_{$memberType}", 600, function () use ($memberType) {
+            return RequiredDocument::where('member_type', $memberType)
+                ->where('is_active', true)
+                ->select(['id', 'document_type', 'name', 'description', 'is_required',
+                         'category', 'has_expiry_date', 'validity_days', 'allowed_formats', 'max_size_mb'])
+                ->get();
+        });
+    }
+
+    /**
+     * Vérification rapide en une requête SQL
+     */
+    private function fastValidationCheck($userId, $requiredTypes)
+    {
+        if (empty($requiredTypes)) {
+            return ['is_complete' => true, 'validated_count' => 0, 'required_count' => 0,
+                    'missing_types' => [], 'validated_types' => []];
+        }
+
+        $validatedTypes = Document::where('user_id', $userId)
+            ->where('status', 'validated')
+            ->whereIn('type', $requiredTypes)
+            ->where('is_profile_document', true)
+            ->distinct()
+            ->pluck('type')
+            ->toArray();
+
+        $missingTypes = array_diff($requiredTypes, $validatedTypes);
+
+        return [
+            'is_complete' => empty($missingTypes),
+            'validated_count' => count($validatedTypes),
+            'required_count' => count($requiredTypes),
+            'missing_types' => $missingTypes,
+            'validated_types' => $validatedTypes
+        ];
+    }
+
+    /**
+     * Validation individuelle - VERSION OPTIMISÉE
      */
     public function validateDocument(Request $request, $id)
     {
-        $document = Document::with('user')->findOrFail($id);
-        $user = $document->user;
+        // Récupération simple sans transaction initiale
+        $document = Document::findOrFail($id);
 
         if ($document->status === 'validated') {
             return back()->with('error', 'Document déjà validé.');
         }
 
+        $user = User::select(['id', 'member_type', 'is_verified'])->find($document->user_id);
+
+        if (!$user) {
+            return back()->with('error', 'Utilisateur non trouvé.');
+        }
+
         try {
-            DB::transaction(function () use ($document, $user) {
-                // Valider le document
-                $document->validateDocument(auth()->id());
+            // Mise à jour simple sans transaction complexe
+            $document->status = 'validated';
+            $document->validated_at = now();
+            $document->validated_by = auth()->id();
+            $document->save();
 
-                // Vérifier si tous les documents requis sont maintenant validés
-                $this->updateUserVerificationStatus($user);
-            });
+            // Vérification optimisée sans boucle
+            $this->quickVerifyUser($user);
 
-            Cache::forget('document_stats');
+            // Invalidation du cache
+            $this->clearUserCache($user->id, $user->member_type);
+            Cache::forget('doc_stats_v2');
 
-            // Message différent selon le statut de vérification
-            if ($user->fresh()->is_verified) {
-                return back()->with('success', 'Document validé. ✅ L\'utilisateur est maintenant entièrement vérifié !');
-            }
+            $isNowVerified = $user->fresh()->is_verified;
 
-            return back()->with('success', 'Document validé avec succès. Des documents sont encore en attente.');
+            return back()->with('success', $isNowVerified
+                ? 'Document validé. ✅ L\'utilisateur est maintenant entièrement vérifié !'
+                : 'Document validé avec succès. Des documents sont encore en attente.');
 
         } catch (\Exception $e) {
-            Log::error('Erreur validation document: ' . $e->getMessage());
+            Log::error('Validation error: ' . $e->getMessage());
             return back()->with('error', 'Erreur lors de la validation.');
         }
     }
 
     /**
-     * Rejet individuel avec mise à jour du statut
+     * Vérification utilisateur ultra-rapide
+     */
+    private function quickVerifyUser(User $user)
+    {
+        $requiredTypes = $this->getCachedRequiredDocs($user->member_type)
+            ->pluck('document_type')
+            ->toArray();
+
+        if (empty($requiredTypes)) {
+            if (!$user->is_verified) {
+                $user->update(['is_verified' => true]);
+            }
+            return;
+        }
+
+        // Comptage direct en SQL
+        $validatedCount = Document::where('user_id', $user->id)
+            ->where('status', 'validated')
+            ->whereIn('type', $requiredTypes)
+            ->where('is_profile_document', true)
+            ->distinct()
+            ->count('type');
+
+        $shouldBeVerified = ($validatedCount >= count($requiredTypes));
+
+        if ($user->is_verified !== $shouldBeVerified) {
+            $user->update(['is_verified' => $shouldBeVerified]);
+            Log::info('User verification updated', ['user_id' => $user->id, 'verified' => $shouldBeVerified]);
+        }
+    }
+
+    /**
+     * Rejet - VERSION OPTIMISÉE
      */
     public function reject(Request $request, $id)
     {
-        $request->validate([
-            'reason' => 'required|string|min:10|max:1000',
-        ]);
+        $request->validate(['reason' => 'required|string|min:10|max:1000']);
 
-        $document = Document::with('user')->findOrFail($id);
-        $user = $document->user;
+        $document = Document::findOrFail($id);
+        $user = User::select(['id', 'is_verified', 'member_type'])->find($document->user_id);
 
         try {
-            DB::transaction(function () use ($document, $request, $user) {
-                $document->rejectDocument($request->reason, auth()->id());
+            $document->status = 'rejected';
+            $document->rejection_reason = $request->reason;
+            $document->validated_by = auth()->id();
+            $document->validated_at = now();
+            $document->save();
 
-                // Si un document est rejeté, l'utilisateur n'est plus vérifié
-                if ($user->is_verified) {
-                    $user->update(['is_verified' => false]);
-                    Log::info('User unverified due to rejection', ['user_id' => $user->id]);
-                }
-            });
+            if ($user && $user->is_verified) {
+                $user->update(['is_verified' => false]);
+            }
 
-            Cache::forget('document_stats');
-            return back()->with('success', 'Document rejeté. Le statut de vérification a été mis à jour.');
+            $this->clearUserCache($user->id ?? null, $user->member_type ?? null);
+            Cache::forget('doc_stats_v2');
+
+            return back()->with('success', 'Document rejeté.');
 
         } catch (\Exception $e) {
-            Log::error('Erreur rejet document: ' . $e->getMessage());
+            Log::error('Rejet error: ' . $e->getMessage());
             return back()->with('error', 'Erreur lors du rejet.');
         }
     }
 
     /**
-     * Validation en masse avec vérification finale
+     * Validation en masse - VERSION SIMPLIFIÉE
      */
     public function bulkValidate(Request $request)
     {
-        $request->validate([
-            'document_ids' => 'required|string',
-        ]);
+        $request->validate(['document_ids' => 'required|string']);
 
-        $ids = array_filter(explode(',', $request->document_ids));
+        $ids = array_slice(array_filter(explode(',', $request->document_ids)), 0, 30); // Max 30
 
         if (empty($ids)) {
             return back()->with('error', 'Aucun document sélectionné.');
         }
 
-        $ids = array_slice($ids, 0, 100);
         $count = 0;
-        $affectedUsers = [];
+        $userIds = [];
 
-        Document::whereIn('id', $ids)
-            ->where('status', '!=', 'validated')
-            ->with('user')
-            ->chunkById(20, function ($documents) use (&$count, &$affectedUsers) {
-                foreach ($documents as $doc) {
-                    try {
-                        $doc->validateDocument(auth()->id());
-                        $count++;
+        // Traitement par lots de 10
+        foreach (array_chunk($ids, 10) as $chunk) {
+            Document::whereIn('id', $chunk)
+                ->where('status', '!=', 'validated')
+                ->update([
+                    'status' => 'validated',
+                    'validated_at' => now(),
+                    'validated_by' => auth()->id()
+                ]);
 
-                        // Tracker les utilisateurs affectés
-                        if (!in_array($doc->user_id, $affectedUsers)) {
-                            $affectedUsers[] = $doc->user_id;
-                        }
-                    } catch (\Exception $e) {
-                        Log::error('Erreur validation document ' . $doc->id . ': ' . $e->getMessage());
-                    }
-                }
-            });
+            $count += count($chunk);
 
-        // Vérifier le statut de tous les utilisateurs affectés
-        foreach ($affectedUsers as $userId) {
-            $user = User::find($userId);
+            // Récupération des user_ids affectés
+            $chunkUserIds = Document::whereIn('id', $chunk)->pluck('user_id')->toArray();
+            $userIds = array_merge($userIds, $chunkUserIds);
+        }
+
+        $userIds = array_unique($userIds);
+
+        // Vérification par lots des utilisateurs
+        foreach (array_slice($userIds, 0, 10) as $uid) { // Max 10 users
+            $user = User::select(['id', 'member_type', 'is_verified'])->find($uid);
             if ($user) {
-                $this->updateUserVerificationStatus($user);
+                $this->quickVerifyUser($user);
+                $this->clearUserCache($uid, $user->member_type);
             }
         }
 
-        Cache::forget('document_stats');
+        Cache::forget('doc_stats_v2');
 
-        $verifiedCount = User::whereIn('id', $affectedUsers)->where('is_verified', true)->count();
-
-        $message = "{$count} document(s) validé(s).";
-        if ($verifiedCount > 0) {
-            $message .= " {$verifiedCount} utilisateur(s) maintenant vérifié(s).";
-        }
-
-        return back()->with('success', $message);
+        return back()->with('success', "{$count} document(s) validé(s).");
     }
 
     /**
-     * Validation de tous les documents d'un utilisateur
+     * Validation tous documents d'un user - AVEC JOB
      */
     public function validateUserDocuments($userId)
     {
-        $user = User::findOrFail($userId);
+        $user = User::select(['id', 'member_type', 'is_verified'])->findOrFail($userId);
 
         $count = Document::where('user_id', $userId)
             ->where('status', '!=', 'validated')
             ->count();
 
         if ($count === 0) {
-            // Vérifier quand même le statut
-            $this->updateUserVerificationStatus($user);
+            $this->quickVerifyUser($user);
             return back()->with('info', 'Tous les documents sont déjà validés.');
         }
 
-        if ($count > 20) {
+        // TOUJOURS utiliser un job si > 5 documents pour éviter timeout
+        if ($count > 5) {
             \App\Jobs\BulkValidateDocuments::dispatch($userId, auth()->id());
-            return back()->with('success', "Validation de {$count} documents en cours (traitement en arrière-plan).");
+            return back()->with('success', "Validation de {$count} documents en cours (arrière-plan).");
         }
 
-        $processed = 0;
+        // Sinon update direct
         Document::where('user_id', $userId)
             ->where('status', '!=', 'validated')
-            ->chunkById(10, function ($documents) use (&$processed) {
-                foreach ($documents as $doc) {
-                    $doc->validateDocument(auth()->id());
-                    $processed++;
-                }
-            });
+            ->update([
+                'status' => 'validated',
+                'validated_at' => now(),
+                'validated_by' => auth()->id()
+            ]);
 
-        // Mettre à jour le statut de vérification
-        $wasVerified = $user->is_verified;
-        $this->updateUserVerificationStatus($user);
+        $this->quickVerifyUser($user);
+        $this->clearUserCache($userId, $user->member_type);
+        Cache::forget('doc_stats_v2');
 
-        Cache::forget('document_stats');
-
-        $message = "{$processed} document(s) validé(s).";
-        if (!$wasVerified && $user->fresh()->is_verified) {
-            $message .= " ✅ L'utilisateur est maintenant vérifié !";
-        }
-
-        return back()->with('success', $message);
+        return back()->with('success', "{$count} document(s) validé(s).");
     }
 
     /**
@@ -280,19 +349,24 @@ class DocumentController extends Controller
      */
     public function pending($id)
     {
-        $document = Document::with('user')->findOrFail($id);
-        $user = $document->user;
+        $document = Document::findOrFail($id);
+        $user = User::select(['id', 'is_verified', 'member_type'])->find($document->user_id);
 
-        $document->markAsPending();
+        $document->update([
+            'status' => 'pending',
+            'validated_at' => null,
+            'validated_by' => null,
+            'rejection_reason' => null
+        ]);
 
-        // Si on remet en attente, l'utilisateur n'est plus vérifié
-        if ($user->is_verified) {
+        if ($user && $user->is_verified) {
             $user->update(['is_verified' => false]);
-            Log::info('User unverified due to pending status', ['user_id' => $user->id]);
         }
 
-        Cache::forget('document_stats');
-        return back()->with('success', 'Document remis en attente. Le statut de vérification a été mis à jour.');
+        $this->clearUserCache($user->id ?? null, $user->member_type ?? null);
+        Cache::forget('doc_stats_v2');
+
+        return back()->with('success', 'Document remis en attente.');
     }
 
     /**
@@ -313,77 +387,18 @@ class DocumentController extends Controller
     }
 
     /**
-     * VÉRIFICATION COMPLÈTE : Met à jour le statut is_verified de l'utilisateur
+     * Nettoyage du cache utilisateur
      */
-    protected function updateUserVerificationStatus(User $user): void
+    private function clearUserCache($userId, $memberType)
     {
-        $requiredTypes = RequiredDocument::getByMemberType($user->member_type, true)
-            ->pluck('document_type')
-            ->toArray();
-
-        // Si pas de documents requis, considérer comme vérifié
-        if (empty($requiredTypes)) {
-            if (!$user->is_verified) {
-                $user->update(['is_verified' => true]);
-                Log::info('User verified (no required docs)', ['user_id' => $user->id]);
-            }
-            return;
+        if ($userId) {
+            Cache::forget("user_docs_{$userId}");
         }
-
-        // Récupérer tous les documents validés de l'utilisateur
-        $validatedTypes = Document::where('user_id', $user->id)
-            ->where('status', 'validated')
-            ->pluck('type')
-            ->unique()
-            ->toArray();
-
-        // Vérifier si tous les types requis sont présents dans les documents validés
-        $missingTypes = array_diff($requiredTypes, $validatedTypes);
-        $isFullyVerified = empty($missingTypes);
-
-        // Mettre à jour si changement
-        if ($user->is_verified !== $isFullyVerified) {
-            $user->update(['is_verified' => $isFullyVerified]);
-
-            Log::info('User verification status updated', [
-                'user_id' => $user->id,
-                'is_verified' => $isFullyVerified,
-                'missing_types' => $missingTypes,
-                'validated_types' => $validatedTypes
-            ]);
+        if ($memberType) {
+            Cache::forget("req_docs_{$memberType}");
+            Cache::forget("required_types_{$memberType}");
         }
-    }
-
-    /**
-     * Vérifier la validation des documents d'un utilisateur
-     */
-    protected function checkUserDocumentsValidation(int $userId, array $requiredTypes): array
-    {
-        if (empty($requiredTypes)) {
-            return [
-                'is_complete' => true,
-                'validated_count' => 0,
-                'required_count' => 0,
-                'missing_types' => [],
-                'validated_types' => []
-            ];
-        }
-
-        $userDocs = Document::where('user_id', $userId)
-            ->where('status', 'validated')
-            ->pluck('type')
-            ->unique()
-            ->toArray();
-
-        $missingTypes = array_diff($requiredTypes, $userDocs);
-
-        return [
-            'is_complete' => empty($missingTypes),
-            'validated_count' => count($userDocs),
-            'required_count' => count($requiredTypes),
-            'missing_types' => $missingTypes,
-            'validated_types' => $userDocs
-        ];
+        Cache::forget('document_stats');
     }
 
     /**
@@ -391,6 +406,7 @@ class DocumentController extends Controller
      */
     public function refreshStats()
     {
+        Cache::forget('doc_stats_v2');
         Cache::forget('document_stats');
         return response()->json(['message' => 'Stats refreshed']);
     }
