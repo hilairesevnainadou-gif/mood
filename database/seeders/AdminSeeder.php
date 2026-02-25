@@ -4,13 +4,15 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Hash;
 
 class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        User::updateOrCreate(
+        // Créer l'admin
+        $admin = User::updateOrCreate(
             ['email' => 'admin@bhdml.com'],
             [
                 'name' => 'Administrateur BHDML',
@@ -38,6 +40,30 @@ class AdminSeeder extends Seeder
             ]
         );
 
-        $this->command->info('✅ Admin créé : admin@bhdml.com / Admin@2024!');
+        // Créer les paramètres globaux (admin)
+        Setting::firstOrCreate(
+            ['user_id' => null],
+            [
+                'notification_email' => true,
+                'notification_sms' => false,
+                'notification_push' => true,
+                'language' => 'fr',
+                'timezone' => 'Africa/Abidjan',
+                'date_format' => 'd/m/Y',
+                'currency' => 'XOF',
+                'theme' => 'light',
+                'email_notifications' => true,
+                'sms_notifications' => false,
+                'push_notifications' => true,
+                'newsletter_subscribed' => true,
+                'two_factor_auth' => false,
+                'data_retention_period' => 365,
+                'auto_logout_time' => 30,
+                'default_view' => 'grid',
+                'rows_per_page' => 25,
+            ]
+        );
+
+        $this->command->info(' Admin créé : admin@bhdml.com / Admin@2024!');
     }
 }

@@ -1,0 +1,306 @@
+/* ============================================
+   Thème BHDM - Banque Humanitaire 
+   du Développement Mondial
+   Pour les emails Laravel
+   ============================================ */
+
+/* ----------------------------------------
+   Base & Typography
+   ---------------------------------------- */
+body {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #343a40;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ----------------------------------------
+   Layout Wrapper
+   ---------------------------------------- */
+.wrapper {
+    background-color: #f8f9fa;
+    width: 100%;
+    min-height: 100vh;
+    padding: 20px 0;
+}
+
+/* ----------------------------------------
+   Main Content Container
+   ---------------------------------------- */
+.content {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+    max-width: 600px;
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+/* ----------------------------------------
+   Header Section
+   ---------------------------------------- */
+.header {
+    background: linear-gradient(135deg, #0F172A 0%, #1e293b 100%);
+    padding: 30px;
+    text-align: center;
+}
+
+.header-logo {
+    max-width: 200px;
+    margin: 0 auto;
+    display: block;
+}
+
+.header-title {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 1px;
+}
+
+.header-subtitle {
+    color: #94a3b8;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 8px;
+}
+
+/* ----------------------------------------
+   Body Content
+   ---------------------------------------- */
+.body {
+    padding: 40px 30px;
+}
+
+h1, h2, h3 {
+    color: #0F172A;
+    margin-top: 0;
+    font-weight: 600;
+}
+
+h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+h2 {
+    font-size: 20px;
+    margin-bottom: 16px;
+}
+
+h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748b;
+}
+
+p {
+    margin-bottom: 16px;
+    color: #475569;
+}
+
+/* ----------------------------------------
+   Buttons
+   ---------------------------------------- */
+.button {
+    display: inline-block;
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.button-primary {
+    background: linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%);
+    color: #ffffff;
+    border: none;
+}
+
+.button-primary:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.25);
+}
+
+.button-success {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: #ffffff;
+}
+
+.button-success:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.button-danger {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    color: #ffffff;
+}
+
+/* ----------------------------------------
+   Panels / Alerts
+   ---------------------------------------- */
+.panel {
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.panel-primary {
+    border-left: 4px solid #2563EB;
+    background: #eff6ff;
+    color: #1e40af;
+}
+
+.panel-success {
+    border-left: 4px solid #10B981;
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.panel-warning {
+    border-left: 4px solid #F59E0B;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.panel-error {
+    border-left: 4px solid #EF4444;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+/* ----------------------------------------
+   Tables (pour les données de compte)
+   ---------------------------------------- */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    background: #f8fafc;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table-row {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.table-row:last-child {
+    border-bottom: none;
+}
+
+.table-cell {
+    padding: 12px 16px;
+    font-size: 14px;
+}
+
+.table-cell-label {
+    font-weight: 600;
+    color: #64748b;
+    width: 40%;
+}
+
+.table-cell-value {
+    color: #0F172A;
+    font-weight: 500;
+}
+
+/* ----------------------------------------
+   Links
+   ---------------------------------------- */
+a {
+    color: #2563EB;
+    text-decoration: underline;
+}
+
+a:hover {
+    color: #1d4ed8;
+}
+
+/* ----------------------------------------
+   Footer
+   ---------------------------------------- */
+.footer {
+    background: #f1f5f9;
+    text-align: center;
+    font-size: 12px;
+    color: #64748b;
+    padding: 30px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.footer p {
+    margin: 0 0 8px 0;
+    color: #64748b;
+}
+
+.footer-brand {
+    font-weight: 700;
+    color: #0F172A;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+/* ----------------------------------------
+   Utility Classes
+   ---------------------------------------- */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-muted {
+    color: #94a3b8;
+}
+
+.text-small {
+    font-size: 12px;
+}
+
+.mb-0 {
+    margin-bottom: 0;
+}
+
+.mt-4 {
+    margin-top: 16px;
+}
+
+/* ----------------------------------------
+   Responsive
+   ---------------------------------------- */
+@media only screen and (max-width: 600px) {
+    .content {
+        width: 100% !important;
+        border-radius: 0;
+    }
+    
+    .body {
+        padding: 30px 20px;
+    }
+    
+    .header {
+        padding: 20px;
+    }
+    
+    .header-title {
+        font-size: 22px;
+    }
+    
+    .button {
+        display: block;
+        width: 100%;
+    }
+}

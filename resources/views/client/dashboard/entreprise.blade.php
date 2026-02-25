@@ -95,76 +95,6 @@
         </div>
     </section>
 
-    <!-- Impact BHDM -->
-    <section class="impact-dashboard" aria-label="Impact de l'entreprise">
-        <div class="impact-header">
-            <h3>
-                <i class="fas fa-trophy" aria-hidden="true"></i>
-                Votre impact BHDM
-            </h3>
-            <div class="impact-score">
-                <span class="score-badge">Score: {{ $entrepriseStats['bhdm_score'] ?? 85 }}/100</span>
-            </div>
-        </div>
-
-        <div class="impact-metrics">
-            <div class="metric-card" data-metric="economic" onclick="navigateTo('{{ route('client.requests.index') }}')">
-                <div class="metric-icon" aria-hidden="true">
-                    <i class="fas fa-chart-pie"></i>
-                </div>
-                <div class="metric-content">
-                    <h4>{{ number_format($entrepriseStats['total_approved'] ?? 0, 0, ',', ' ') }} FCFA</h4>
-                    <p>Capital mobilisé</p>
-                    <div class="metric-progress">
-                        @php
-                            $economicProgress = min(($entrepriseStats['total_approved'] ?? 0) / 5000000 * 100, 100);
-                        @endphp
-                        <div class="progress-bar" style="width: {{ $economicProgress }}%" aria-valuenow="{{ $economicProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="metric-card" data-metric="social" onclick="navigateTo('{{ route('client.requests.index') }}')">
-                <div class="metric-icon" aria-hidden="true">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="metric-content">
-                    <h4>{{ $entrepriseStats['jobs_created'] ?? 0 }}</h4>
-                    <p>Emplois générés</p>
-                    <div class="metric-progress">
-                        @php
-                            $socialProgress = min(($entrepriseStats['jobs_created'] ?? 0) / 50 * 100, 100);
-                        @endphp
-                        <div class="progress-bar" style="width: {{ $socialProgress }}%" aria-valuenow="{{ $socialProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="metric-card" data-metric="development" onclick="navigateTo('{{ route('client.trainings') }}')">
-                <div class="metric-icon" aria-hidden="true">
-                    <i class="fas fa-graduation-cap"></i>
-                </div>
-                <div class="metric-content">
-                    <h4>{{ $entrepriseStats['training_completed'] ?? 0 }}</h4>
-                    <p>Formations suivies</p>
-                    <div class="metric-progress">
-                        @php
-                            $trainingProgress = min(($entrepriseStats['training_completed'] ?? 0) / 10 * 100, 100);
-                        @endphp
-                        <div class="progress-bar" style="width: {{ $trainingProgress }}%" aria-valuenow="{{ $trainingProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="impact-actions">
-            <a href="{{ route('client.requests.create') }}" class="impact-btn">
-                <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                Nouveau projet d'impact
-            </a>
-        </div>
-    </section>
-
     <!-- Portefeuille Entreprise -->
     <section class="enterprise-wallet-card" aria-label="Portefeuille">
         <div class="wallet-header">
@@ -187,7 +117,22 @@
                     <h2>{{ number_format($wallet->balance ?? 0, 0, ',', ' ') }}</h2>
                 </div>
                 @php
-                    $walletChange = $generalStats['wallet_change'] ?? 0;
+                    // CORRECTION: Vérifier si wallet_change est un tableau et extraire la valeur si nécessaire
+                    $walletChangeRaw = $generalStats['wallet_change'] ?? 0;
+                    
+                    // Si c'est un tableau, prendre la première valeur numérique trouvée ou 0
+                    if (is_array($walletChangeRaw)) {
+                        $walletChange = 0;
+                        // Essayer de trouver une valeur numérique dans le tableau
+                        foreach ($walletChangeRaw as $key => $value) {
+                            if (is_numeric($value)) {
+                                $walletChange = (float) $value;
+                                break;
+                            }
+                        }
+                    } else {
+                        $walletChange = is_numeric($walletChangeRaw) ? (float) $walletChangeRaw : 0;
+                    }
                 @endphp
                 <div class="balance-trend {{ $walletChange >= 0 ? 'positive' : 'negative' }}">
                     <i class="fas fa-arrow-{{ $walletChange >= 0 ? 'up' : 'down' }}" aria-hidden="true"></i>

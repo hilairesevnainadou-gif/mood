@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserController extends Controller
 {
@@ -81,60 +85,151 @@ class UserController extends Controller
     /**
      * Affiche les détails d'un utilisateur
      */
-public function show($id)
-{
-    $user = User::with([
-        'wallet',
-        'documents' => function ($query) {
-            $query->latest()->limit(10);
-        },
-        'transactions' => function ($query) {
-            $query->latest()->limit(10);
-        },
-        'supportTickets' => function ($query) {
-            $query->latest()->limit(10);
-        },
-        'fundingRequests' => function ($query) {
-            $query->latest()->limit(10);
+    public function show($id)
+    {
+        $user = User::with([
+            'wallet',
+            'documents' => function ($query) {
+                $query->latest()->limit(10);
+            },
+            'transactions' => function ($query) {
+                $query->latest()->limit(10);
+            },
+            'supportTickets' => function ($query) {
+                $query->latest()->limit(10);
+            },
+            'fundingRequests' => function ($query) {
+                $query->latest()->limit(10);
+            }
+        ])->findOrFail($id);
+
+        // Statistiques additionnelles pour la vue détail
+        $stats = [
+            'wallet_balance' => $user->wallet ? $user->wallet->balance : 0,
+            'wallet_currency' => $user->wallet ? $user->wallet->currency : 'XOF',
+            'wallet_status' => $user->wallet ? $user->wallet->status : 'inactive',
+            
+            'total_transactions_count' => $user->transactions()->count(),
+            'completed_transactions_count' => $user->transactions()->where('transactions.status', 'completed')->count(),
+            'pending_transactions_count' => $user->transactions()->where('transactions.status', 'pending')->count(),
+            'failed_transactions_count' => $user->transactions()->where('transactions.status', 'failed')->count(),
+            'cancelled_transactions_count' => $user->transactions()->where('transactions.status', 'cancelled')->count(),
+            
+            'deposits_count' => $user->transactions()->where('transactions.type', 'credit')->count(),
+            'withdrawals_count' => $user->transactions()->where('transactions.type', 'debit')->count(),
+            'transfers_count' => $user->transactions()->where('transactions.type', 'transfer')->count(),
+            'payments_count' => $user->transactions()->where('transactions.type', 'payment')->count(),
+            
+            'total_transactions_amount' => $user->transactions()->sum('amount'),
+            'total_completed_amount' => $user->transactions()
+                ->where('transactions.status', 'completed')
+                ->sum('amount'),
+            
+            'documents_validated' => $user->documents()->where('status', 'validated')->count(),
+            'documents_pending' => $user->documents()->where('status', 'pending')->count(),
+            
+            'open_tickets' => $user->supportTickets()->where('status', 'open')->count(),
+            'funding_count' => $user->fundingRequests()->count(),
+        ];
+
+        return view('admin.users.show', compact('user', 'stats'));
+    }
+
+    /**
+     * Affiche le formulaire de création d'un administrateur
+     */
+    public function createAdmin()
+    {
+        return view('admin.users.create-admin');
+    }
+
+    /**
+     * Crée un nouvel administrateur dans le système
+     */
+    public function storeAdmin(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:30', 'unique:users,phone'],
+            'password' => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
+            'gender' => ['nullable', 'in:male,female,other'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'postal_code' => ['nullable', 'string', 'max:20'],
+            'job_title' => ['nullable', 'string', 'max:100'],
+            'is_super_admin' => ['sometimes', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return back()
+                ->withErrors($validator)
+                ->withInput();
         }
-    ])->findOrFail($id);
 
-    // Statistiques additionnelles pour la vue détail
-    $stats = [
-        'wallet_balance' => $user->wallet ? $user->wallet->balance : 0,
-        'wallet_currency' => $user->wallet ? $user->wallet->currency : 'XOF',
-        'wallet_status' => $user->wallet ? $user->wallet->status : 'inactive',
-        
-        // CORRECTION : Préfixer 'status' avec 'transactions.'
-        'total_transactions_count' => $user->transactions()->count(),
-        'completed_transactions_count' => $user->transactions()->where('transactions.status', 'completed')->count(),
-        'pending_transactions_count' => $user->transactions()->where('transactions.status', 'pending')->count(),
-        'failed_transactions_count' => $user->transactions()->where('transactions.status', 'failed')->count(),
-        'cancelled_transactions_count' => $user->transactions()->where('transactions.status', 'cancelled')->count(),
-        
-        // CORRECTION : Préfixer 'type' avec 'transactions.' (si ambigu)
-        'deposits_count' => $user->transactions()->where('transactions.type', 'credit')->count(),
-        'withdrawals_count' => $user->transactions()->where('transactions.type', 'debit')->count(),
-        'transfers_count' => $user->transactions()->where('transactions.type', 'transfer')->count(),
-        'payments_count' => $user->transactions()->where('transactions.type', 'payment')->count(),
-        
-        // Montants totaux
-        'total_transactions_amount' => $user->transactions()->sum('amount'),
-        'total_completed_amount' => $user->transactions()
-            ->where('transactions.status', 'completed')
-            ->sum('amount'),
-        
-        // Documents
-        'documents_validated' => $user->documents()->where('status', 'validated')->count(),
-        'documents_pending' => $user->documents()->where('status', 'pending')->count(),
-        
-        // Tickets et financements
-        'open_tickets' => $user->supportTickets()->where('status', 'open')->count(),
-        'funding_count' => $user->fundingRequests()->count(),
-    ];
+        try {
+            DB::transaction(function () use ($request) {
+                $user = User::create([
+                    'first_name' => $request->first_name,
+                    'last_name' => $request->last_name,
+                    'name' => $request->first_name . ' ' . $request->last_name,
+                    'email' => $request->email,
+                    'phone' => $request->phone,
+                    'password' => Hash::make($request->password),
+                    'gender' => $request->gender,
+                    'address' => $request->address,
+                    'city' => $request->city,
+                    'country' => $request->country ?? 'CI',
+                    'postal_code' => $request->postal_code,
+                    'job_title' => $request->job_title ?? 'Administrateur',
+                    'company_name' => 'Administration',
+                    'member_type' => 'admin',
+                    'is_admin' => true,
+                    'is_moderator' => false,
+                    'is_active' => true,
+                    'is_verified' => true,
+                    'email_verified_at' => now(),
+                    'member_status' => 'active',
+                    'accepts_newsletter' => false,
+                    'accepts_notifications' => true,
+                ]);
 
-    return view('admin.users.show', compact('user', 'stats'));
-}
+                // Générer le member_id
+                $user->member_id = 'ADM' . str_pad($user->id, 6, '0', STR_PAD_LEFT);
+                $user->save();
+
+                // Créer les paramètres par défaut
+                $user->settings()->create([
+                    'notification_email' => true,
+                    'notification_sms' => false,
+                    'notification_push' => true,
+                    'language' => 'fr',
+                    'timezone' => 'Africa/Abidjan',
+                    'theme' => 'light',
+                ]);
+
+                // Logger la création
+                \Log::info('Nouvel administrateur créé', [
+                    'admin_id' => $user->id,
+                    'email' => $user->email,
+                    'created_by' => auth()->id(),
+                ]);
+            });
+
+            return redirect()
+                ->route('admin.users.index')
+                ->with('success', 'Administrateur créé avec succès. Un email de confirmation a été envoyé.');
+
+        } catch (\Exception $e) {
+            \Log::error('Erreur création admin', ['error' => $e->getMessage()]);
+            
+            return back()
+                ->with('error', 'Erreur lors de la création de l\'administrateur: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
 
     /**
      * Met à jour les informations d'un utilisateur
@@ -177,16 +272,12 @@ public function show($id)
 
         $user->update(['is_active' => true]);
 
-        // Optionnel : Envoyer un email de notification
-        // $user->notify(new AccountActivatedNotification());
-
         return back()->with('success', 'Utilisateur activé avec succès.');
     }
 
     /**
      * Désactive un utilisateur
      */
-    // Dans UserController::deactivate()
     public function deactivate($id)
     {
         $user = User::findOrFail($id);
@@ -195,8 +286,7 @@ public function show($id)
             return back()->with('info', 'Cet utilisateur est déjà inactif.');
         }
 
-        // Utilisation de la nouvelle méthode
-        if ($user->hasPendingOperations()) {
+        if ($this->hasPendingOperations($user)) {
             return back()->with('warning', 'Impossible de désactiver : opérations en cours.');
         }
 
@@ -223,34 +313,73 @@ public function show($id)
      */
     public function export(Request $request)
     {
-        $users = User::all();
+        $query = User::query();
+
+        // Appliquer les mêmes filtres que l'index
+        if ($request->has('search')) {
+            $searchTerm = '%' . trim($request->search) . '%';
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('first_name', 'like', $searchTerm)
+                    ->orWhere('last_name', 'like', $searchTerm)
+                    ->orWhere('email', 'like', $searchTerm)
+                    ->orWhere('phone', 'like', $searchTerm);
+            });
+        }
+
+        if ($request->status === 'active') {
+            $query->where('is_active', true);
+        } elseif ($request->status === 'inactive') {
+            $query->where('is_active', false);
+        }
+
+        $users = $query->get();
 
         $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="users_' . now()->format('Y-m-d') . '.csv"',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="users_' . now()->format('Y-m-d_His') . '.csv"',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
         ];
 
         $callback = function () use ($users) {
             $file = fopen('php://output', 'w');
+            
+            // BOM pour UTF-8
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
 
             // En-têtes CSV
-            fputcsv($file, ['ID', 'Nom', 'Email', 'Téléphone', 'Statut', 'Date d\'inscription']);
+            fputcsv($file, [
+                'ID', 
+                'Member ID',
+                'Nom complet', 
+                'Email', 
+                'Téléphone', 
+                'Type', 
+                'Statut', 
+                'Vérifié',
+                'Date d\'inscription',
+                'Dernière connexion'
+            ]);
 
             foreach ($users as $user) {
                 fputcsv($file, [
                     $user->id,
+                    $user->member_id,
                     $user->full_name,
                     $user->email,
                     $user->phone,
+                    $user->member_type ?? 'Particulier',
                     $user->is_active ? 'Actif' : 'Inactif',
+                    $user->is_verified ? 'Oui' : 'Non',
                     $user->created_at->format('d/m/Y H:i'),
+                    $user->last_login_at ? $user->last_login_at->format('d/m/Y H:i') : 'Jamais',
                 ]);
             }
 
             fclose($file);
         };
 
-        return response()->stream($callback, 200, $headers);
+        return new StreamedResponse($callback, 200, $headers);
     }
 
     /**
@@ -262,7 +391,17 @@ public function show($id)
 
         // Empêcher la suppression si opérations existantes
         if ($user->transactions()->exists() || $user->fundingRequests()->exists()) {
-            return back()->with('error', 'Impossible de supprimer : historique présent.');
+            return back()->with('error', 'Impossible de supprimer : historique de transactions présent.');
+        }
+
+        // Empêcher la suppression de son propre compte
+        if ($user->id === auth()->id()) {
+            return back()->with('error', 'Vous ne pouvez pas supprimer votre propre compte.');
+        }
+
+        // Empêcher la suppression d'autres admins
+        if ($user->is_admin && $user->id !== auth()->id()) {
+            return back()->with('error', 'Vous ne pouvez pas supprimer un autre administrateur.');
         }
 
         $user->delete();

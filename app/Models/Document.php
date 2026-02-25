@@ -108,10 +108,20 @@ class Document extends Model
         return $query->where('status', 'rejected');
     }
 
+    /**
+     * NOUVEAU SCOPE : Documents soumis (pending ou validated)
+     */
+    public function scopeSubmitted($query)
+    {
+        return $query->whereIn('status', ['pending', 'validated']);
+    }
+
     public function scopeNotExpired($query)
     {
-        return $query->where('is_expired', false)
-            ->orWhereNull('expiry_date');
+        return $query->where(function ($q) {
+            $q->where('is_expired', false)
+              ->orWhereNull('expiry_date');
+        });
     }
 
     public function scopeExpired($query)
@@ -384,6 +394,9 @@ class Document extends Model
         })->toArray();
     }
 
+    /**
+     * MÉTHODE ORIGINALE : Récupère les documents validés manquants (strict)
+     */
     public static function getMissingRequiredDocuments($userId, $memberType)
     {
         $requiredDocuments = RequiredDocument::getByMemberType($memberType, true);
@@ -413,6 +426,9 @@ class Document extends Model
         return $missingDocuments;
     }
 
+    /**
+     * MÉTHODE ORIGINALE : Récupère les documents uploadés (pending/validated) manquants
+     */
     public static function getMissingUploadedRequiredDocuments($userId, $memberType)
     {
         $requiredDocuments = RequiredDocument::getByMemberType($memberType, true);
@@ -440,6 +456,79 @@ class Document extends Model
         }
 
         return $missingDocuments;
+    }
+
+    /**
+     * NOUVELLE MÉTHODE : Récupère les documents soumis (pending/validated) manquants
+     * Alias de getMissingUploadedRequiredDocuments pour plus de clarté
+     */
+    public static function getMissingSubmittedRequiredDocuments($userId, $memberType)
+    {
+        return self::getMissingUploadedRequiredDocuments($userId, $memberType);
+    }
+
+    /**
+     * NOUVELLE MÉTHODE : Vérifie si tous les documents requis sont soumis (pending ou validated)
+     */
+    public static function hasAllRequiredDocumentsSubmitted($userId, $memberType)
+    {
+        $missing = self::getMissingSubmittedRequiredDocuments($userId, $memberType);
+        return empty($missing);
+    }
+
+    /**
+     * NOUVELLE MÉTHODE : Vérifie si tous les documents requis sont validés (strict)
+     */
+    public static function hasAllRequiredDocumentsValidated($userId, $memberType)
+    {
+        $missing = self::getMissingRequiredDocuments($userId, $memberType);
+        return empty($missing);
+    }
+
+    /**
+     * NOUVELLE MÉTHODE : Compte les documents soumis par statut
+     */
+    public static function getSubmittedDocumentsCount($userId, $memberType)
+    {
+        $requiredDocs = RequiredDocument::getByMemberType($memberType, true);
+        
+        $counts = [
+            'total_required' => $requiredDocs->where('is_required', true)->count(),
+            'submitted' => 0,
+            'pending' => 0,
+            'validated' => 0,
+            'rejected' => 0,
+            'missing' => 0
+        ];
+
+        foreach ($requiredDocs as $requiredDoc) {
+            if (!$requiredDoc->is_required) continue;
+
+            $doc = self::where('user_id', $userId)
+                ->where('type', $requiredDoc->document_type)
+                ->where('is_profile_document', true)
+                ->whereIn('status', ['pending', 'validated', 'rejected'])
+                ->where(function ($query) use ($requiredDoc) {
+                    if ($requiredDoc->has_expiry_date) {
+                        $query->where(function ($q) {
+                            $q->whereNull('expiry_date')
+                                ->orWhere('expiry_date', '>', now());
+                        });
+                    }
+                })
+                ->first();
+
+            if ($doc) {
+                $counts['submitted']++;
+                if ($doc->status === 'pending') $counts['pending']++;
+                if ($doc->status === 'validated') $counts['validated']++;
+                if ($doc->status === 'rejected') $counts['rejected']++;
+            } else {
+                $counts['missing']++;
+            }
+        }
+
+        return $counts;
     }
 
     public static function isValidDocumentType($memberType, $documentType)

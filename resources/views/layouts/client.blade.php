@@ -4,10 +4,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    
+
     <!-- CSRF Token - CRITIQUE -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    
+
     <!-- Anti-cache headers pour pages protégées -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -16,8 +16,8 @@
     <!-- PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="BHDM Client">
-    <meta name="application-name" content="BHDM Client">
+    <meta name="apple-mobile-web-app-title" content="BHDM">
+    <meta name="application-name" content="BHDM">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1b5a8d">
     <meta name="msapplication-TileColor" content="#1b5a8d">
@@ -62,7 +62,7 @@
     <!-- CSS Client -->
     <link rel="stylesheet" href="{{ asset('css/client.css') }}">
 
-    <title>@yield('title', 'BHDM Client')</title>
+    <title>@yield('title', 'BHDM')</title>
     @stack('styles')
 
     <!-- Styles pour la photo de profil -->
@@ -82,6 +82,7 @@
             overflow: hidden;
             border: 2px solid rgba(255,255,255,0.3);
             flex-shrink: 0;
+            background-color: #e2e8f0;
         }
 
         .user-avatar-large .profile-avatar-container {
@@ -113,10 +114,53 @@
             font-weight: 600;
             color: white;
             font-size: 1rem;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
         }
 
         .user-avatar-large .avatar-placeholder {
             font-size: 1.5rem;
+        }
+
+        /* Style pour l'avatar par défaut */
+        .default-avatar-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Styles pour le statut documents complets */
+        .status-badge.status-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .btn-success-custom {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-success-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            color: white;
+        }
+
+        /* Animation pour le badge Nouveau */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .badge-pulse {
+            animation: pulse 2s infinite;
         }
     </style>
 </head>
@@ -124,7 +168,9 @@
 <body class="client-body">
     @php
         $user = Auth::user();
-        $hasUploadedRequiredDocuments = $user?->hasUploadedRequiredDocuments() ?? false;
+        // NOUVELLE LOGIQUE : documents soumis (pending ou validated) débloquent l'accès
+        $hasSubmittedRequiredDocuments = $user?->hasSubmittedRequiredDocuments() ?? false;
+        // Information de validation pour affichage visuel uniquement
         $hasValidatedRequiredDocuments = $user?->hasAllRequiredDocuments() ?? false;
     @endphp
 
@@ -146,7 +192,7 @@
                 </svg>
             </div>
             <div class="preloader-text">
-                <h2>BHDM Client</h2>
+                <h2>BHDM</h2>
                 <p>Chargement de votre espace...</p>
             </div>
             <div class="preloader-progress">
@@ -186,7 +232,7 @@
                     <div class="brand-logo">
                         <img src="{{ asset('images/logo.png') }}" alt="BHDM" class="logo-img">
                         <div class="brand-text">
-                            <h1 class="app-title">BHDM Client</h1>
+                            <h1 class="app-title">BHDM</h1>
                             <div class="app-status" id="appStatus">
                                 <span class="status-indicator online"></span>
                                 <span class="status-text">En ligne</span>
@@ -199,11 +245,6 @@
                 <div class="header-actions">
                     <!-- Quick Actions -->
                     <div class="quick-actions">
-                        <button class="action-btn search-btn" id="searchTrigger" aria-label="Rechercher"
-                            title="Rechercher">
-                            <i class="fas fa-search"></i>
-                        </button>
-
                         @php
                             $unreadCount = 0;
                             if (auth()->check()) {
@@ -228,14 +269,12 @@
                                         <img src="{{ $user->profile_photo_url }}?v={{ time() }}"
                                              alt="Photo de profil"
                                              class="profile-photo-img"
-                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                        <div class="avatar-placeholder" style="display: none; background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};">
-                                            {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
-                                        </div>
+                                             onerror="this.onerror=null; this.src='{{ asset('images/avatar.png') }}';">
                                     @else
-                                        <div class="avatar-placeholder" style="background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};">
-                                            {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
-                                        </div>
+                                        <img src="{{ asset('images/avatar.png') }}"
+                                             alt="{{ Auth::user()->name ?? 'Utilisateur' }}"
+                                             class="default-avatar-img"
+                                             loading="lazy">
                                     @endif
                                 </div>
                                 <div class="profile-info">
@@ -249,10 +288,6 @@
                                     <i class="fas fa-user" aria-hidden="true"></i>
                                     <span>Mon Profil</span>
                                 </a>
-                                <a href="{{ route('client.settings') }}" class="dropdown-item" role="menuitem">
-                                    <i class="fas fa-cog" aria-hidden="true"></i>
-                                    <span>Paramètres</span>
-                                </a>
                                 <div class="dropdown-divider" role="separator"></div>
                                 <button class="dropdown-item logout-item" id="logoutTrigger" role="menuitem">
                                     <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
@@ -263,27 +298,11 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Search Bar -->
-            <div class="search-overlay" id="searchOverlay">
-                <div class="search-container">
-                    <div class="search-input-group">
-                        <i class="fas fa-search search-icon" aria-hidden="true"></i>
-                        <input type="text" class="search-input"
-                            placeholder="Rechercher transactions, documents, etc..." id="globalSearchInput"
-                            aria-label="Recherche globale">
-                        <button class="search-clear" id="searchClear" aria-label="Effacer la recherche">
-                            <i class="fas fa-times" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    <button class="search-close" id="searchClose" aria-label="Fermer la recherche">
-                        <i class="fas fa-times" aria-hidden="true"></i>
-                    </button>
-                </div>
-            </div>
         </header>
 
-        @if (! $hasUploadedRequiredDocuments)
+        <!-- BANNIERES DE STATUT - LOGIQUE MIS À JOUR -->
+        @if (! $hasSubmittedRequiredDocuments)
+            <!-- Documents manquants - Bloquant -->
             <div class="status-banner">
                 <div class="status-banner-content">
                     <div>
@@ -292,12 +311,12 @@
                             Documents requis
                         </span>
                         <p class="status-banner-message">
-                            Téléchargez vos pièces d'identité obligatoires pour accéder au tableau de bord.
+                            Téléchargez vos pièces d'identité obligatoires pour accéder à toutes les fonctionnalités.
                         </p>
                     </div>
                     <div class="status-banner-actions">
                         <a href="{{ route('client.documents.upload.form') }}" class="btn-primary">
-                            Télécharger maintenant
+                            <i class="fas fa-upload"></i> Télécharger maintenant
                         </a>
                         <a href="{{ route('client.documents.index') }}" class="btn-secondary">
                             Voir mes documents
@@ -305,22 +324,46 @@
                     </div>
                 </div>
             </div>
-        @elseif ($hasUploadedRequiredDocuments && ! $hasValidatedRequiredDocuments)
-            <div class="status-banner">
+        @elseif ($hasSubmittedRequiredDocuments && ! $hasValidatedRequiredDocuments)
+            <!-- Documents soumis en attente de validation - ACCÈS COMPLET -->
+            <div class="status-banner" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%); border-left: 4px solid #10b981;">
                 <div class="status-banner-content">
                     <div>
-                        <span class="status-badge status-warning">
-                            <i class="fas fa-hourglass-half" aria-hidden="true"></i>
-                            Validation en cours
+                        <span class="status-badge status-success">
+                            <i class="fas fa-check-circle" aria-hidden="true"></i>
+                            Documents reçus
                         </span>
                         <p class="status-banner-message">
-                            Vos documents sont en cours de validation. Les demandes, wallet et formations seront
-                            disponibles après validation.
+                            <strong>Bonne nouvelle !</strong> Vos documents sont en cours de validation. 
+                            En attendant, vous pouvez utiliser <strong>toutes les fonctionnalités</strong> : créer des demandes, accéder à votre wallet et aux formations.
                         </p>
                     </div>
                     <div class="status-banner-actions">
+                        <a href="{{ route('client.requests.create') }}" class="btn-success-custom">
+                            <i class="fas fa-plus-circle"></i> Nouvelle demande
+                        </a>
                         <a href="{{ route('client.documents.index') }}" class="btn-secondary">
-                            Suivre mes documents
+                            <i class="fas fa-folder-open"></i> Mes documents
+                        </a>
+                    </div>
+                </div>
+            </div>
+        @else
+            <!-- Documents validés -->
+            <div class="status-banner" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%); border-left: 4px solid #3b82f6;">
+                <div class="status-banner-content">
+                    <div>
+                        <span class="status-badge" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2);">
+                            <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                            Compte vérifié
+                        </span>
+                        <p class="status-banner-message">
+                            Vos documents ont été validés. Vous avez accès à l'ensemble des fonctionnalités BHDM.
+                        </p>
+                    </div>
+                    <div class="status-banner-actions">
+                        <a href="{{ route('client.requests.create') }}" class="btn-primary">
+                            <i class="fas fa-plus-circle"></i> Nouvelle demande
                         </a>
                     </div>
                 </div>
@@ -329,7 +372,7 @@
 
         <!-- Main Content Area -->
         <main class="app-main" id="mainContent">
-            <!-- Side Navigation -->
+            <!-- Side Navigation - ACCÈS COMPLET DÈS SOUMISSION -->
             <nav class="app-sidebar" id="appSidebar" aria-label="Navigation principale">
                 <div class="sidebar-header">
                     <div class="sidebar-user">
@@ -339,22 +382,28 @@
                                     <img src="{{ $user->profile_photo_url }}?v={{ time() }}"
                                          alt="Photo de profil"
                                          class="profile-photo-img"
-                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <div class="avatar-placeholder" style="display: none; background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};">
-                                        {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
-                                    </div>
+                                         onerror="this.onerror=null; this.src='{{ asset('images/avatar.png') }}';">
                                 @else
-                                    <div class="avatar-placeholder" style="background-color: #{{ substr(md5(Auth::id() ?? '1'), 0, 6) }};">
-                                        {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
-                                    </div>
+                                    <img src="{{ asset('images/avatar.png') }}"
+                                         alt="{{ Auth::user()->name ?? 'Utilisateur' }}"
+                                         class="default-avatar-img"
+                                         loading="lazy">
                                 @endif
                             </div>
                             <div class="user-details">
                                 <h4>{{ Auth::user()->name ?? 'Utilisateur' }}</h4>
                                 <span class="user-id">{{ Auth::user()->member_id ?? 'Membre' }}</span>
                                 <div class="user-status">
-                                    <span class="status-dot online" id="sidebarStatusDot" aria-hidden="true"></span>
-                                    <span id="sidebarStatusText">Connecté</span>
+                                    <span class="status-dot {{ $hasSubmittedRequiredDocuments ? 'online' : 'offline' }}" id="sidebarStatusDot" aria-hidden="true"></span>
+                                    <span id="sidebarStatusText">
+                                        @if($hasValidatedRequiredDocuments)
+                                            Compte vérifié
+                                        @elseif($hasSubmittedRequiredDocuments)
+                                            Validation en cours
+                                        @else
+                                            Documents requis
+                                        @endif
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -365,11 +414,11 @@
                 </div>
 
                 <div class="sidebar-menu">
-                    <!-- Navigation Principale -->
+                    <!-- Navigation Principale - ACCÈS DÈS SOUMISSION -->
                     <div class="menu-section">
                         <h6 class="section-title">Navigation</h6>
                         <ul class="menu-list" role="menu">
-                            @if ($hasUploadedRequiredDocuments)
+                            @if ($hasSubmittedRequiredDocuments)
                                 <li class="menu-item {{ Request::is('client/dashboard*') ? 'active' : '' }}">
                                     <a href="{{ route('client.dashboard') }}" class="menu-link page-transition"
                                         role="menuitem">
@@ -379,8 +428,8 @@
                                         <span class="menu-text">Tableau de bord</span>
                                     </a>
                                 </li>
-                            @endif
-                            @if ($hasValidatedRequiredDocuments)
+                                
+                                <!-- WALLET accessible dès soumission -->
                                 <li class="menu-item {{ Request::is('client/wallet*') ? 'active' : '' }}">
                                     <a href="{{ route('client.wallet.index') }}" class="menu-link page-transition"
                                         role="menuitem">
@@ -388,8 +437,13 @@
                                             <i class="fas fa-wallet"></i>
                                         </span>
                                         <span class="menu-text">Mon Portefeuille</span>
+                                        @if(!$hasValidatedRequiredDocuments)
+                                            <span class="badge bg-success ms-auto badge-pulse" style="font-size: 0.5rem;" title="Accessible pendant la validation">●</span>
+                                        @endif
                                     </a>
                                 </li>
+                                
+                                <!-- DEMANDES accessible dès soumission -->
                                 <li class="menu-item {{ Request::is('client/requests*') ? 'active' : '' }}">
                                     <a href="{{ route('client.requests.index') }}" class="menu-link page-transition"
                                         role="menuitem">
@@ -397,13 +451,27 @@
                                             <i class="fas fa-file-contract"></i>
                                         </span>
                                         <span class="menu-text">Mes Demandes</span>
+                                        @if($user->fundingRequests()->count() === 0 && $hasSubmittedRequiredDocuments)
+                                            <span class="badge bg-success ms-auto badge-pulse" style="font-size: 0.6rem;">NEW</span>
+                                        @endif
                                     </a>
+                                </li>
+                            @else
+                                <!-- Seul le profil accessible sans documents -->
+                                <li class="menu-item disabled" style="opacity: 0.5;">
+                                    <span class="menu-link" style="cursor: not-allowed;">
+                                        <span class="menu-icon" aria-hidden="true">
+                                            <i class="fas fa-chart-line"></i>
+                                        </span>
+                                        <span class="menu-text">Tableau de bord</span>
+                                        <i class="fas fa-lock ms-auto" style="font-size: 0.7rem;"></i>
+                                    </span>
                                 </li>
                             @endif
                         </ul>
                     </div>
 
-                    <!-- Contenus -->
+                    <!-- Contenus - ACCÈS DÈS SOUMISSION -->
                     <div class="menu-section">
                         <h6 class="section-title">Contenus</h6>
                         <ul class="menu-list" role="menu">
@@ -414,9 +482,18 @@
                                         <i class="fas fa-folder"></i>
                                     </span>
                                     <span class="menu-text">Documents</span>
+                                    @if(!$hasSubmittedRequiredDocuments)
+                                        <span class="badge bg-warning ms-auto" style="font-size: 0.6rem;">!</span>
+                                    @elseif(!$hasValidatedRequiredDocuments)
+                                        <span class="badge bg-info ms-auto" style="font-size: 0.5rem;">⏱</span>
+                                    @else
+                                        <span class="badge bg-success ms-auto" style="font-size: 0.5rem;">✓</span>
+                                    @endif
                                 </a>
                             </li>
-                            @if ($hasValidatedRequiredDocuments)
+                            
+                            @if ($hasSubmittedRequiredDocuments)
+                                <!-- FORMATIONS accessible dès soumission -->
                                 <li class="menu-item {{ Request::is('client/training*') ? 'active' : '' }}">
                                     <a href="{{ route('client.trainings') }}" class="menu-link page-transition"
                                         role="menuitem">
@@ -424,15 +501,28 @@
                                             <i class="fas fa-graduation-cap"></i>
                                         </span>
                                         <span class="menu-text">Formations</span>
+                                        @if(!$hasValidatedRequiredDocuments)
+                                            <span class="badge bg-success ms-auto badge-pulse" style="font-size: 0.5rem;" title="Accessible pendant la validation">●</span>
+                                        @endif
                                     </a>
+                                </li>
+                            @else
+                                <li class="menu-item disabled" style="opacity: 0.5;">
+                                    <span class="menu-link" style="cursor: not-allowed;">
+                                        <span class="menu-icon" aria-hidden="true">
+                                            <i class="fas fa-graduation-cap"></i>
+                                        </span>
+                                        <span class="menu-text">Formations</span>
+                                        <i class="fas fa-lock ms-auto" style="font-size: 0.7rem;"></i>
+                                    </span>
                                 </li>
                             @endif
                         </ul>
                     </div>
 
-                    <!-- Support & Paramètres -->
+                    <!-- Support - Toujours accessible -->
                     <div class="menu-section">
-                        <h6 class="section-title">Support & Paramètres</h6>
+                        <h6 class="section-title">Support</h6>
                         <ul class="menu-list" role="menu">
                             <li class="menu-item {{ Request::is('client/notifications*') ? 'active' : '' }}">
                                 <a href="{{ route('client.notifications.index') }}" class="menu-link page-transition"
@@ -450,15 +540,6 @@
                                         <i class="fas fa-headset"></i>
                                     </span>
                                     <span class="menu-text">Support Client</span>
-                                </a>
-                            </li>
-                            <li class="menu-item {{ Request::is('client/settings*') ? 'active' : '' }}">
-                                <a href="{{ route('client.settings') }}" class="menu-link page-transition"
-                                    role="menuitem">
-                                    <span class="menu-icon" aria-hidden="true">
-                                        <i class="fas fa-cog"></i>
-                                    </span>
-                                    <span class="menu-text">Paramètres</span>
                                 </a>
                             </li>
                             <li class="menu-item {{ Request::is('client/profile*') ? 'active' : '' }}">
@@ -501,30 +582,60 @@
             </div>
         </main>
 
-        <!-- Bottom Navigation (Mobile Only) -->
+        <!-- Bottom Navigation (Mobile) - ACCÈS COMPLET DÈS SOUMISSION -->
         <nav class="app-bottom-nav" id="bottomNav" aria-label="Navigation mobile">
-            @if ($hasUploadedRequiredDocuments)
+            @if ($hasSubmittedRequiredDocuments)
                 <a href="{{ route('client.dashboard') }}"
                     class="nav-item page-transition {{ Request::is('client/dashboard*') ? 'active' : '' }}"
                     aria-label="Accueil">
                     <i class="fas fa-home" aria-hidden="true"></i>
                     <span>Accueil</span>
                 </a>
-            @endif
-            @if ($hasValidatedRequiredDocuments)
+                
+                <!-- WALLET accessible dès soumission -->
                 <a href="{{ route('client.wallet.index') }}"
                     class="nav-item page-transition {{ Request::is('client/wallet*') ? 'active' : '' }}"
                     aria-label="Portefeuille">
                     <i class="fas fa-wallet" aria-hidden="true"></i>
                     <span>Portefeuille</span>
                 </a>
+                
+                <!-- DEMANDES accessible dès soumission -->
                 <a href="{{ route('client.requests.index') }}"
                     class="nav-item page-transition {{ Request::is('client/requests*') ? 'active' : '' }}"
                     aria-label="Demandes">
                     <i class="fas fa-file-alt" aria-hidden="true"></i>
                     <span>Demandes</span>
+                    @if($user->fundingRequests()->count() === 0)
+                        <span class="badge bg-success position-absolute" style="top: 5px; right: 5px; font-size: 0.5rem; padding: 2px 4px;">NEW</span>
+                    @endif
+                </a>
+                
+                <!-- FORMATIONS accessible dès soumission -->
+                <a href="{{ route('client.trainings') }}"
+                    class="nav-item page-transition {{ Request::is('client/training*') ? 'active' : '' }}"
+                    aria-label="Formations">
+                    <i class="fas fa-graduation-cap" aria-hidden="true"></i>
+                    <span>Formations</span>
+                </a>
+            @else
+                <!-- Version limitée sans documents -->
+                <a href="{{ route('client.documents.index') }}"
+                    class="nav-item page-transition {{ Request::is('client/documents*') ? 'active' : '' }}"
+                    aria-label="Documents">
+                    <i class="fas fa-folder" aria-hidden="true"></i>
+                    <span>Documents</span>
+                    <span class="badge bg-warning position-absolute" style="top: 5px; right: 5px; font-size: 0.5rem;">!</span>
+                </a>
+                
+                <a href="{{ route('client.support.index') }}"
+                    class="nav-item page-transition {{ Request::is('client/support*') ? 'active' : '' }}"
+                    aria-label="Support">
+                    <i class="fas fa-headset" aria-hidden="true"></i>
+                    <span>Support</span>
                 </a>
             @endif
+            
             <a href="{{ route('client.profile') }}"
                 class="nav-item page-transition {{ Request::is('client/profile*') ? 'active' : '' }}"
                 aria-label="Profil">
@@ -532,9 +643,11 @@
                     <img src="{{ $user->profile_photo_url }}?v={{ time() }}"
                          alt="Profil"
                          class="bottom-nav-avatar"
-                         onerror="this.style.display='none'; this.parentNode.innerHTML='<i class=\'fas fa-user\' aria-hidden=\'true\'></i><span>Profil</span>';">
+                         onerror="this.onerror=null; this.src='{{ asset('images/avatar.png') }}';">
                 @else
-                    <i class="fas fa-user" aria-hidden="true"></i>
+                    <img src="{{ asset('images/avatar.png') }}"
+                         alt="Profil"
+                         class="bottom-nav-avatar">
                 @endif
                 <span>Profil</span>
             </a>
@@ -590,7 +703,7 @@
         </div>
     </div>
 
-    <!-- Logout Form - CORRIGÉ: utilise route('logout') et non route('client.logout') -->
+    <!-- Logout Form -->
     <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
         @csrf
     </form>
@@ -629,14 +742,13 @@
             initOnlineStatus();
             initPageTransitions();
             initEventListeners();
-            initSessionKeepAlive(); // NOUVEAU: Garde la session active
+            initSessionKeepAlive();
         }
     </script>
 
-    <!-- Session Keep Alive - NOUVEAU -->
+    <!-- Session Keep Alive -->
     <script>
         function initSessionKeepAlive() {
-            // Ping toutes les 5 minutes pour garder la session active
             setInterval(async () => {
                 try {
                     const response = await fetch('/api/session-check', {
@@ -647,16 +759,15 @@
                         },
                         credentials: 'same-origin'
                     });
-                    
+
                     if (!response.ok) {
                         console.warn('Session check failed');
                     }
                 } catch (error) {
                     console.error('Keep-alive error:', error);
                 }
-            }, 300000); // 5 minutes
-            
-            // Rafraîchir le token CSRF avant les requêtes importantes
+            }, 300000);
+
             window.refreshCsrfToken = async function() {
                 try {
                     const response = await fetch('/api/session-check', {
@@ -665,7 +776,6 @@
                     const data = await response.json();
                     if (data.csrf_token) {
                         document.querySelector('meta[name="csrf-token"]').content = data.csrf_token;
-                        // Mettre à jour aussi les inputs hidden des formulaires
                         document.querySelectorAll('input[name="_token"]').forEach(input => {
                             input.value = data.csrf_token;
                         });
@@ -1027,62 +1137,6 @@
                 });
             }
 
-            const searchTrigger = document.getElementById('searchTrigger');
-            const searchClose = document.getElementById('searchClose');
-            const searchClear = document.getElementById('searchClear');
-            const searchInput = document.getElementById('globalSearchInput');
-            const searchOverlay = document.getElementById('searchOverlay');
-
-            if (searchTrigger && searchOverlay) {
-                searchTrigger.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    searchOverlay.classList.add('active');
-                    searchOverlay.setAttribute('aria-hidden', 'false');
-                    document.body.style.overflow = 'hidden';
-                    setTimeout(() => {
-                        if (searchInput) searchInput.focus();
-                    }, 100);
-                });
-            }
-
-            if (searchClose) {
-                searchClose.addEventListener('click', () => {
-                    searchOverlay.classList.remove('active');
-                    searchOverlay.setAttribute('aria-hidden', 'true');
-                    document.body.style.overflow = '';
-                    if (searchInput) searchInput.value = '';
-                });
-            }
-
-            if (searchClear) {
-                searchClear.addEventListener('click', () => {
-                    if (searchInput) {
-                        searchInput.value = '';
-                        searchInput.focus();
-                    }
-                });
-            }
-
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && searchOverlay.classList.contains('active')) {
-                    searchOverlay.classList.remove('active');
-                    searchOverlay.setAttribute('aria-hidden', 'true');
-                    document.body.style.overflow = '';
-                    if (searchInput) searchInput.value = '';
-                } else if (e.key === '/' && e.ctrlKey) {
-                    e.preventDefault();
-                    searchTrigger.click();
-                }
-            });
-
-            searchOverlay.addEventListener('click', (e) => {
-                if (e.target === searchOverlay) {
-                    searchOverlay.classList.remove('active');
-                    searchOverlay.setAttribute('aria-hidden', 'true');
-                    document.body.style.overflow = '';
-                }
-            });
-
             function trapFocus(element) {
                 const focusableElements = element.querySelectorAll(
                     'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -1372,7 +1426,7 @@
         }
     </script>
 
-    <!-- Page Transitions System - CORRIGÉ avec vérification de session -->
+    <!-- Page Transitions System -->
     <script>
         function initPageTransitions() {
             const transitionOverlay = document.getElementById('pageTransitionOverlay');
@@ -1389,7 +1443,6 @@
                     e.preventDefault();
                     const href = this.href;
 
-                    // Vérifier la session avant de naviguer
                     try {
                         const sessionCheck = await fetch('/api/session-check', {
                             headers: {
@@ -1398,13 +1451,12 @@
                             },
                             credentials: 'same-origin'
                         });
-                        
+
                         if (!sessionCheck.ok) {
-                            // Session invalide, rediriger vers login
                             window.location.href = '/login';
                             return;
                         }
-                        
+
                         const sessionData = await sessionCheck.json();
                         if (!sessionData.authenticated) {
                             window.location.href = '/login';
@@ -1412,7 +1464,6 @@
                         }
                     } catch (error) {
                         console.error('Session check error:', error);
-                        // Continuer quand même, la page cible vérifiera l'auth
                     }
 
                     if (transitionOverlay) {
@@ -1569,7 +1620,7 @@
             setTimeout(() => {
                 if (deferredPrompt && toastSystem) {
                     toastSystem.primary('Installer l\'application',
-                        'Pour une meilleure expérience, installez BHDM Client sur votre appareil.', {
+                        'Pour une meilleure expérience, installez BHDM sur votre appareil.', {
                             duration: 8000,
                             actions: [{
                                 text: 'Installer',

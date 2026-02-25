@@ -5,26 +5,31 @@
 @section('content')
 <div class="pwa-dashboard particulier-dashboard" id="dashboard-container">
     <!-- En-tête utilisateur avec salutation dynamique -->
-    <div class="pwa-header-card" id="greeting-card">
-        <div class="pwa-user-greeting">
-            <div class="pwa-user-avatar">
-                @if(Auth::user()->profile_photo)
-                    <img src="{{ Storage::url(Auth::user()->profile_photo) }}" alt="{{ Auth::user()->name }}" loading="lazy">
-                @else
-                    <div class="avatar-placeholder" style="background: linear-gradient(135deg, #{{ substr(md5(Auth::id()), 0, 6) }} 0%, #{{ substr(md5(Auth::id()), 6, 6) }} 100%)">
-                        {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
-                    </div>
-                @endif
-            </div>
-            <div class="pwa-user-info">
-                <h2><span id="greeting-text"></span> {{ Auth::user()->first_name ?? Auth::user()->name }} !</h2>
-                <p class="user-status">
-                    <span class="status-dot bg-success"></span>
-                    Membre Particulier • {{ $particulierStats['profession'] ?? 'Non spécifié' }}
-                </p>
-            </div>
+
+<div class="pwa-header-card" id="greeting-card">
+    <div class="pwa-user-greeting">
+        <div class="pwa-user-avatar">
+            @if(Auth::user()->profile_photo_url)
+                <img src="{{ Auth::user()->profile_photo_url }}?v={{ time() }}"
+                     alt="{{ Auth::user()->name }}"
+                     loading="lazy">
+            @else
+                <div class="avatar-placeholder" style="background: linear-gradient(135deg, #{{ substr(md5(Auth::id()), 0, 6) }} 0%, #{{ substr(md5(Auth::id()), 6, 6) }} 100%)">
+                    <img src="{{ asset('images\avatar.png') }}"
+                     alt="{{ Auth::user()->name }}"
+                     loading="lazy">
+                </div>
+            @endif
+        </div>
+        <div class="pwa-user-info">
+            <h2><span id="greeting-text"></span> {{ Auth::user()->first_name ?? Auth::user()->name }} !</h2>
+            <p class="user-status">
+                <span class="status-dot bg-success"></span>
+                Membre Particulier • {{ $particulierStats['profession'] ?? 'Non spécifié' }}
+            </p>
         </div>
     </div>
+</div>
 
     <!-- Bannière de bienvenue -->
     <div class="pwa-welcome-banner">

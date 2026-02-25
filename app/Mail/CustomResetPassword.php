@@ -15,6 +15,7 @@ class CustomResetPassword extends Mailable
     public $user;
     public $token;
     public $resetUrl;
+    public $expireMinutes;
 
     public function __construct($user, $token)
     {
@@ -24,6 +25,7 @@ class CustomResetPassword extends Mailable
             'token' => $token,
             'email' => $user->email,
         ], false));
+        $this->expireMinutes = config('auth.passwords.users.expire', 60);
     }
 
     public function envelope(): Envelope
@@ -31,20 +33,20 @@ class CustomResetPassword extends Mailable
         return new Envelope(
             from: new Address(
                 config('mail.from.address'),
-                config('mail.from.name')
+                config('mail.from.name', 'BHDM - Banque Humanitaire')
             ),
-            subject: '🔑 Réinitialisation de votre mot de passe - BHDM',
+            subject: 'Reinitialisation de votre mot de passe - BHDM',
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.reset-password',
+            view: 'emails.reset-password',
             with: [
                 'user' => $this->user,
                 'url' => $this->resetUrl,
-                'expireMinutes' => config('auth.passwords.users.expire', 60),
+                'expireMinutes' => $this->expireMinutes,
             ],
         );
     }

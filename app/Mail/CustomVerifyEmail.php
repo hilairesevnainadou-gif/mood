@@ -3,7 +3,6 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -12,25 +11,25 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 
-class CustomVerifyEmail extends Mailable implements ShouldQueue
+class CustomVerifyEmail extends Mailable
 {
     use Queueable;
 
     public $user;
-    public $verificationUrl;
+    public $url;
+    public $expireMinutes;
+    public $isEnterprise;
+    public $memberId;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct($user)
     {
         $this->user = $user;
-        $this->verificationUrl = $this->generateVerificationUrl($user);
+        $this->url = $this->generateVerificationUrl($user);
+        $this->expireMinutes = Config::get('auth.verification.expire', 60);
+        $this->isEnterprise = $user->member_type === 'entreprise';
+        $this->memberId = $user->member_id;
     }
 
-    /**
-     * Generate signed verification URL
-     */
     protected function generateVerificationUrl($user): string
     {
         return URL::temporarySignedRoute(
@@ -43,9 +42,6 @@ class CustomVerifyEmail extends Mailable implements ShouldQueue
         );
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
@@ -53,39 +49,21 @@ class CustomVerifyEmail extends Mailable implements ShouldQueue
                 config('mail.from.address'),
                 config('mail.from.name', 'BHDM - Banque Humanitaire')
             ),
-            subject: '🔐 Confirmez votre adresse email - BHDM',
-            tags: ['verification', 'inscription'],
-            metadata: [
-                'user_id' => $this->user->id,
-                'member_type' => $this->user->member_type,
-            ],
+            subject: 'Confirmez votre adresse email - BHDM',
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.verify-email',
+            view: 'emails.verify-email',
             with: [
                 'user' => $this->user,
-                'url' => $this->verificationUrl,
-                'expireMinutes' => Config::get('auth.verification.expire', 60),
-                'isEnterprise' => $this->user->member_type === 'entreprise',
-                'memberId' => $this->user->member_id,
+                'url' => $this->url,
+                'expireMinutes' => $this->expireMinutes,
+                'isEnterprise' => $this->isEnterprise,
+                'memberId' => $this->memberId,
             ],
         );
-    }
-
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
-    public function attachments(): array
-    {
-        return [];
     }
 }

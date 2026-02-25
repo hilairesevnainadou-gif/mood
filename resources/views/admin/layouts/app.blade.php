@@ -53,14 +53,62 @@
                         <i class="fa-solid fa-money-bill-wave"></i>
                         <span>Transactions</span>
                     </a>
-                    <a href="{{ route('admin.funding.pending-validation') }}" class="{{ request()->routeIs('admin.funding.*') ? 'active' : '' }}">
-                        <i class="fa-solid fa-file-signature"></i>
-                        <span>Financement</span>
-                        <span class="badge">3</span>
-                    </a>
+
+                    {{-- Financement avec sous-menu --}}
+                    <div class="nav-item-dropdown {{ request()->routeIs('admin.funding.*') ? 'open' : '' }}">
+                        <a href="#" class="nav-dropdown-toggle {{ request()->routeIs('admin.funding.*') ? 'active' : '' }}" onclick="toggleDropdown(event, 'fundingMenu')">
+                            <div class="nav-link-content">
+                                <i class="fa-solid fa-file-signature"></i>
+                                <span>Financement</span>
+                                @php
+                                    $fundingCount = \App\Models\FundingRequest::whereIn('status', ['submitted', 'under_review', 'pending_committee', 'validated', 'documents_validated'])->count();
+                                @endphp
+                                @if($fundingCount > 0)
+                                    <span class="badge bg-danger">{{ $fundingCount }}</span>
+                                @endif
+                            </div>
+                            <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
+                        </a>
+                        <div class="nav-dropdown-menu {{ request()->routeIs('admin.funding.*') ? 'show' : '' }}" id="fundingMenu">
+                            <a href="{{ route('admin.funding.pending-validation') }}" class="{{ request()->routeIs('admin.funding.pending-validation') ? 'active' : '' }}">
+                                <span>En attente de validation</span>
+                                @php
+                                    $pendingValidationCount = \App\Models\FundingRequest::whereIn('status', ['submitted', 'under_review', 'pending_committee'])->count();
+                                @endphp
+                                @if($pendingValidationCount > 0)
+                                    <span class="badge bg-warning text-dark">{{ $pendingValidationCount }}</span>
+                                @endif
+                            </a>
+                            <a href="{{ route('admin.funding.pending-transfers') }}" class="{{ request()->routeIs('admin.funding.pending-transfers') ? 'active' : '' }}">
+                                <span>Transferts en attente</span>
+                                @php
+                                    $pendingTransferCount = \App\Models\FundingRequest::whereIn('status', ['documents_validated', 'transfer_pending'])->count();
+                                @endphp
+                                @if($pendingTransferCount > 0)
+                                    <span class="badge bg-info">{{ $pendingTransferCount }}</span>
+                                @endif
+                            </a>
+                            <a href="{{ route('admin.funding.pending-payments') }}" class="{{ request()->routeIs('admin.funding.pending-payments') ? 'active' : '' }}">
+                                <span>Paiements en attente</span>
+                                @php
+                                    $pendingPaymentCount = \App\Models\FundingRequest::whereIn('status', ['validated', 'pending_payment'])->count();
+                                @endphp
+                                @if($pendingPaymentCount > 0)
+                                    <span class="badge bg-primary">{{ $pendingPaymentCount }}</span>
+                                @endif
+                            </a>
+                        </div>
+                    </div>
+
                     <a href="{{ route('admin.documents.index') }}" class="{{ request()->routeIs('admin.documents.*') ? 'active' : '' }}">
                         <i class="fa-solid fa-folder-open"></i>
                         <span>Documents</span>
+                    </a>
+
+                    {{-- Documents Requis --}}
+                    <a href="{{ route('admin.required-documents.index') }}" class="{{ request()->routeIs('admin.required-documents.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-file-circle-check"></i>
+                        <span>Documents Requis</span>
                     </a>
                 </div>
 
@@ -73,7 +121,15 @@
                     <a href="{{ route('admin.support.index') }}" class="{{ request()->routeIs('admin.support.*') ? 'active' : '' }}">
                         <i class="fa-solid fa-headset"></i>
                         <span>Support</span>
-                        <span class="badge bg-danger">Nouveau</span>
+                        @php
+                            $unreadSupportCount = \App\Models\SupportTicket::where('status', 'open')
+                                ->whereHas('messages', function($q) {
+                                    $q->where('is_admin', false)->where('read', false);
+                                })->count();
+                        @endphp
+                        @if($unreadSupportCount > 0)
+                            <span class="badge bg-danger">Nouveau</span>
+                        @endif
                     </a>
                 </div>
 
@@ -123,7 +179,12 @@
                         </button>
                         <button class="action-btn has-notification" type="button" title="Notifications" onclick="toggleNotifications()">
                             <i class="fa-solid fa-bell"></i>
-                            <span class="notification-dot"></span>
+                            @php
+                                $notificationCount = $fundingCount + $unreadSupportCount;
+                            @endphp
+                            @if($notificationCount > 0)
+                                <span class="notification-dot"></span>
+                            @endif
                         </button>
                         <button class="action-btn" type="button" title="Messages" onclick="toggleMessages()">
                             <i class="fa-solid fa-envelope"></i>
@@ -177,7 +238,6 @@
             if (sidebarClose) {
                 sidebarClose.addEventListener('click', function(e) {
                     e.preventDefault();
-                    e.stopPropagation();
                     closeSidebar();
                 });
             }
@@ -191,7 +251,7 @@
             }
 
             // Fermer en cliquant sur un lien (mobile)
-            const navLinks = document.querySelectorAll('.admin-nav a');
+            const navLinks = document.querySelectorAll('.admin-nav a:not(.nav-dropdown-toggle)');
             navLinks.forEach(function(link) {
                 link.addEventListener('click', function() {
                     if (window.innerWidth <= 1024) {
@@ -229,6 +289,16 @@
                 }
             });
         });
+
+        // Toggle dropdown menu
+        function toggleDropdown(event, menuId) {
+            event.preventDefault();
+            const menu = document.getElementById(menuId);
+            const toggle = event.currentTarget;
+
+            menu.classList.toggle('show');
+            toggle.classList.toggle('open');
+        }
 
         // Fonctions pour les boutons d'action
         function toggleSearch() {

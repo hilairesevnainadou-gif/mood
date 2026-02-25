@@ -12,6 +12,9 @@ class VerifyCsrfToken extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        //
+       '/kkiapay/callback',
+        '/wallet/deposit/callback',
+        'kkiapay/callback', // sans slash aussi
+        'wallet/deposit/callback',
     ];
 }

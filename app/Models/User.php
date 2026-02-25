@@ -7,8 +7,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Mail; 
+use App\Mail\CustomVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail; 
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -94,7 +97,8 @@ class User extends Authenticatable
         }
         return strtoupper(substr($this->name ?? 'U', 0, 2));
     }
- /**
+
+    /**
      * Send the email verification notification.
      * OVERRIDE de la méthode par défaut de MustVerifyEmail
      */
@@ -309,6 +313,10 @@ class User extends Authenticatable
         return $this->member_type === 'particulier';
     }
 
+    /**
+     * Vérifie si l'utilisateur est une entreprise
+     * (Suppression du doublon - cette méthode existait déjà plus haut)
+     */
     public function isEntreprise(): bool
     {
         return $this->member_type === 'entreprise';
@@ -412,26 +420,87 @@ class User extends Authenticatable
         return $training ? (int) $training->pivot->progress : 0;
     }
 
-    // Méthodes documents
+    // ============================================
+    // MÉTHODES DOCUMENTS - MISES À JOUR
+    // ============================================
+
+    /**
+     * Vérifie si TOUS les documents requis sont VALIDÉS (strict)
+     * Utilisé pour les opérations sensibles
+     */
     public function hasAllRequiredDocuments(): bool
     {
         $missing = Document::getMissingRequiredDocuments($this->id, $this->member_type);
         return empty($missing);
     }
 
+    /**
+     * Vérifie si tous les documents requis sont UPLOADÉS (pending ou validated)
+     * C'est la méthode principale pour débloquer les fonctionnalités
+     * @deprecated Utilisez hasSubmittedRequiredDocuments() à la place
+     */
     public function hasUploadedRequiredDocuments(): bool
     {
-        $missing = Document::getMissingUploadedRequiredDocuments($this->id, $this->member_type);
-        return empty($missing);
+        return $this->hasSubmittedRequiredDocuments();
     }
 
+    /**
+     * NOUVELLE MÉTHODE PRINCIPALE : Vérifie si les documents sont SOUMIS (pending ou validated)
+     * Accepte les statuts: pending, validated (mais pas rejected ou expired)
+     * Cette méthode débloque l'accès aux fonctionnalités
+     */
+    public function hasSubmittedRequiredDocuments(): bool
+    {
+        $requiredDocs = RequiredDocument::where('member_type', $this->member_type)
+            ->where('is_active', true)
+            ->where('is_required', true)
+            ->get();
+
+        foreach ($requiredDocs as $requiredDoc) {
+            $hasValidDocument = Document::where('user_id', $this->id)
+                ->where('type', $requiredDoc->document_type)
+                ->where('is_profile_document', true)
+                ->whereIn('status', ['pending', 'validated']) // ← Accepte pending ET validated
+                ->where(function ($query) use ($requiredDoc) {
+                    if ($requiredDoc->has_expiry_date) {
+                        $query->where(function ($q) {
+                            $q->whereNull('expiry_date')
+                                ->orWhere('expiry_date', '>', now());
+                        });
+                    }
+                })
+                ->exists();
+
+            if (!$hasValidDocument) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Récupère la liste des documents requis manquants (strict - uniquement validated)
+     */
     public function getMissingRequiredDocuments()
     {
         return Document::getMissingRequiredDocuments($this->id, $this->member_type);
     }
 
+    /**
+     * Récupère la liste des documents uploadés manquants (pending ou validated)
+     * @deprecated Utilisez getMissingSubmittedRequiredDocuments() à la place
+     */
     public function getMissingUploadedRequiredDocuments()
     {
-        return Document::getMissingUploadedRequiredDocuments($this->id, $this->member_type);
+        return $this->getMissingSubmittedRequiredDocuments();
+    }
+
+    /**
+     * NOUVELLE MÉTHODE : Récupère les documents soumis manquants
+     */
+    public function getMissingSubmittedRequiredDocuments()
+    {
+        return Document::getMissingSubmittedRequiredDocuments($this->id, $this->member_type);
     }
 }

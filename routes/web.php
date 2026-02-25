@@ -1,36 +1,35 @@
 <?php
 
+use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
+use App\Http\Controllers\Admin\FundingValidationController;
+use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\RequiredDocumentController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SupportController as AdminSupportController;
+use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
+use App\Http\Controllers\Admin\TransactionController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\ProgramController;
+use App\Http\Controllers\Api\StatController;
+use App\Http\Controllers\Api\WalletController as ApiWalletController;
+use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
+use App\Http\Controllers\Client\DocumentController as ClientDocumentController;
+use App\Http\Controllers\Client\ProfileController;
+use App\Http\Controllers\Client\RequestFundingController;
+use App\Http\Controllers\ClientController;
+use App\Http\Controllers\PwaController;
+use App\Http\Controllers\SSEController;
+use App\Http\Controllers\TrainingController;
+use App\Http\Controllers\WalletController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\PwaController;
-use App\Http\Controllers\SSEController;
-use App\Http\Controllers\ClientController;
-use App\Http\Controllers\WalletController;
-use App\Http\Controllers\Api\StatController;
-use App\Http\Controllers\TrainingController;
-use App\Http\Controllers\Admin\AuthController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Api\ContactController;
-use App\Http\Controllers\Admin\ReportController;
-use App\Http\Controllers\Admin\SettingController;
-use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\TransactionController;
-use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
-use App\Http\Controllers\Admin\SupportController as AdminSupportController;
-use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
-use App\Http\Controllers\Admin\FundingValidationController;
-
-use App\Http\Controllers\Api\ProgramController;
-use App\Http\Controllers\Api\WalletController as ApiWalletController;
-
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
-use App\Http\Controllers\Client\RequestFundingController;
-use App\Http\Controllers\Client\ProfileController;
-use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
-use App\Http\Controllers\Client\DocumentController as ClientDocumentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -84,22 +83,17 @@ Route::get('/forgot-password', function () {
 
 Route::post('/forgot-password', [ClientController::class, 'sendResetLink'])->name('password.email');
 
-// Reset Password
-// Reset Password 
 Route::get('/reset/{token}', function ($token) {
-    // Récupérer l'email depuis l'URL (?email=...)
     $email = request('email');
-    
-    // Log pour débogage
-    \Log::info('Affichage formulaire reset', [
+    Log::info('Affichage formulaire reset', [
         'token' => $token,
         'email' => $email,
         'full_url' => request()->fullUrl()
     ]);
-    
+
     return view('auth.reset-password', [
         'token' => $token,
-        'email' => $email // ✅ Passer l'email à la vue
+        'email' => $email
     ]);
 })->name('password.reset');
 
@@ -121,10 +115,8 @@ Route::post('/confirm-password', function (Request $request) {
     return redirect()->intended();
 })->middleware(['auth', 'throttle:6,1'])->name('password.confirm.post');
 
-// Global Logout - SINGLE SOURCE OF TRUTH
 Route::post('/logout', [ClientController::class, 'logout'])->name('logout');
 
-// Email Verification
 Route::middleware(['auth'])->group(function () {
     Route::get('/email/verify', function () {
         return view('auth.verify-email');
@@ -213,24 +205,35 @@ Route::get('/funding/check-updates', [WalletController::class, 'checkFundingUpda
 
 /*
 |--------------------------------------------------------------------------
-| KKIPAY CALLBACK - ROUTES PUBLIQUES (hors auth et hors CSRF)
+| KKIAPAY CALLBACK - ROUTES PUBLIQUES (hors auth et hors CSRF)
 |--------------------------------------------------------------------------
-
-
 */
 
-// Callback pour les demandes de financement
-Route::post('/kkiapay/callback', [RequestFundingController::class, 'kkiapayCallback'])
-    ->name('kkiapay.callback');
+// CALLBACK PRINCIPAL KKIAPAY - Doit être accessible publiquement
+Route::match(['get', 'post'], '/kkiapay/callback', [WalletController::class, 'kkiapayCallback'])
+    ->name('kkiapay.callback')
+    ->withoutMiddleware(['auth', 'verified', \App\Http\Middleware\VerifyCsrfToken::class]);
 
-// Callback pour les dépôts wallet - SANS middleware web (pas de CSRF)
-Route::withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class])
-    ->post('/wallet/deposit/callback', [WalletController::class, 'depositCallback'])
-    ->name('client.wallet.deposit.callback');
+// CALLBACK ALTERNATIF pour dépôt wallet
+Route::post('/wallet/deposit/callback', [WalletController::class, 'kkiapayCallback'])
+    ->name('client.wallet.deposit.callback')
+    ->withoutMiddleware(['auth', 'verified', \App\Http\Middleware\VerifyCsrfToken::class]);
+
+// Routes de paiement (protégées par auth)
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/payment/success/{transaction}', [WalletController::class, 'paymentSuccess'])
+        ->name('payment.success');
+    Route::get('/payment/failed/{transaction}', [WalletController::class, 'paymentFailed'])
+        ->name('payment.failed');
+    Route::get('/payment/error', [WalletController::class, 'paymentError'])
+        ->name('payment.error');
+    Route::get('/payment/status/{transaction}', [WalletController::class, 'paymentStatus'])
+        ->name('payment.status');
+});
 
 /*
 |--------------------------------------------------------------------------
-| Session Check API (pour vérifier l'état de la session)
+| Session Check API
 |--------------------------------------------------------------------------
 */
 
@@ -269,38 +272,20 @@ Route::middleware(['auth', 'verified'])->prefix('client')->name('client.')->grou
             Route::post('/{id}/payment', [RequestFundingController::class, 'processCustomPayment'])->name('payment.process')->where('id', '[0-9]+');
         });
 
-    // Wallet - Routes protégées (SANS le callback qui est publique)
+    // Wallet Routes (sans le callback qui est public)
     Route::prefix('wallet')->name('wallet.')->middleware('profile.documents.validated')->group(function () {
 
-        // Page principale
         Route::get('/', [WalletController::class, 'wallet'])->name('index');
-
-        // Historique des transactions
         Route::get('/transactions', [WalletController::class, 'transactions'])->name('transactions');
-
-        // Dépôt via Kkiapay - Initialisation uniquement
         Route::post('/deposit', [WalletController::class, 'deposit'])->name('deposit');
-        // PAS de callback ici, il est en dehors du groupe auth
-
-        // Retrait
         Route::post('/withdraw', [WalletController::class, 'withdraw'])->name('withdraw');
-
-        // Transfert
         Route::post('/transfer', [WalletController::class, 'transfer'])->name('transfer');
-
-        // Gestion du PIN
         Route::post('/set-pin', [WalletController::class, 'setPin'])->name('set-pin');
         Route::post('/verify-pin', [WalletController::class, 'verifyPin'])->name('verify-pin');
-
-        // API infos
         Route::get('/get-info', [WalletController::class, 'getWalletInfo'])->name('get-info');
-
-        // API financements
         Route::get('/check-funding-updates', [WalletController::class, 'checkFundingUpdates'])->name('funding.check');
         Route::get('/funding/{id}/details', [WalletController::class, 'fundingDetails'])->name('funding.details');
         Route::post('/funding/{id}/credit', [WalletController::class, 'creditFunding'])->name('funding.credit');
-
-        // Actions rapides
         Route::get('/quick-actions', [WalletController::class, 'getQuickActions'])->name('quick-actions');
     });
 
@@ -373,8 +358,6 @@ Route::middleware(['auth', 'verified'])->prefix('client')->name('client.')->grou
         Route::get('/statistics', [ClientController::class, 'getStats'])->name('stats');
         Route::get('/check-permission', [ClientController::class, 'checkPermission'])->name('check-permission');
     });
-    
-    // PAS DE ROUTE LOGOUT ICI - utilise la route globale /logout
 });
 
 // Email Verification Status Route
@@ -393,36 +376,22 @@ Route::get('/api/user/verification-status', function () {
 
 Route::prefix('admin')->name('admin.')->group(function () {
 
-    // ============================================================
-    // PUBLIC ROUTES (Unauthenticated)
-    // ============================================================
+    // Public Admin Routes
+    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 
-    // Login GET - Display Form
-    Route::get('/login', [AuthController::class, 'showLoginForm'])
-        ->name('login');
-
-    // Login POST - Submit Form
-    Route::post('/login', [AuthController::class, 'login'])
-        ->name('login.submit');
-
-    // ============================================================
-    // PROTECTED ROUTES (Authenticated Admin)
-    // ============================================================
-
+    // Protected Admin Routes
     Route::middleware(['auth:admin'])->group(function () {
 
-        // --- DASHBOARD ---
-        Route::get('/dashboard', [DashboardController::class, 'index'])
-            ->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-        // --- LOGOUT ---
-        Route::post('/logout', [AuthController::class, 'logout'])
-            ->name('logout');
-
-        // --- USER MANAGEMENT ---
+        // User Management
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/', [UserController::class, 'index'])->name('index');
             Route::get('/export', [UserController::class, 'export'])->name('export');
+            Route::get('/create-admin', [UserController::class, 'createAdmin'])->name('create-admin');
+            Route::post('/store-admin', [UserController::class, 'storeAdmin'])->name('store-admin');
             Route::get('/{id}', [UserController::class, 'show'])->name('show');
             Route::put('/{id}', [UserController::class, 'update'])->name('update');
             Route::post('/{id}/activate', [UserController::class, 'activate'])->name('activate');
@@ -430,7 +399,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::delete('/{id}', [UserController::class, 'destroy'])->name('destroy');
         });
 
-        // --- TRANSACTIONS MANAGEMENT ---
+        // Transactions
         Route::prefix('transactions')->name('transactions.')->group(function () {
             Route::get('/', [TransactionController::class, 'index'])->name('index');
             Route::get('/export', [TransactionController::class, 'export'])->name('export');
@@ -440,69 +409,29 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/{id}/cancel', [TransactionController::class, 'cancelTransaction'])->name('cancel');
         });
 
-        // --- FUNDING REQUEST VALIDATION ---
+        // Funding Validation
         Route::prefix('funding')->name('funding.')->group(function () {
-
-            // === LISTES ET VUES ===
-            Route::get('/pending-validation', [FundingValidationController::class, 'pendingValidation'])
-                ->name('pending-validation');
-
-            // NOUVELLE ROUTE: Liste des transferts en attente de validation finale
-            Route::get('/pending-transfers', [FundingValidationController::class, 'pendingTransfers'])
-                ->name('pending-transfers');
-
-            Route::get('/pending-payments', [FundingValidationController::class, 'pendingPayments'])
-                ->name('pending-payments');
-
-            Route::get('/{id}', [FundingValidationController::class, 'showRequest'])
-                ->name('show-request');
-
-            // === ACTIONS SUR DEMANDES PERSONNALISÉES ===
-            Route::post('/{id}/set-price', [FundingValidationController::class, 'setPrice'])
-                ->name('set-price');
-
-            Route::post('/{id}/under-review', [FundingValidationController::class, 'setUnderReview'])
-                ->name('under-review');
-
-            Route::post('/{id}/reject', [FundingValidationController::class, 'rejectRequest'])
-                ->name('reject-request');
-
-            // === ACTIONS SUR DEMANDES PRÉDÉFINIES ===
-            Route::post('/{id}/approve-predefined', [FundingValidationController::class, 'approvePredefined'])
-                ->name('approve-predefined');
-
-            // Vérification des documents (valide ou crée documents manquants)
-            Route::post('/{id}/check-documents', [FundingValidationController::class, 'checkDocuments'])
-                ->name('check-documents');
-
-            // NOUVELLE ROUTE: Vérifier documents manquants et programmer transfert
-            Route::post('/{id}/verify-and-schedule', [FundingValidationController::class, 'verifyMissingDocumentsAndScheduleTransfer'])
-                ->name('verify-and-schedule');
-
-            // === GESTION DU TRANSFERT DIFFÉRÉ ===
-            // NOUVELLE ROUTE: Exécuter le transfert final (créditer le wallet)
-            Route::post('/{id}/execute-transfer', [FundingValidationController::class, 'executeTransfer'])
-                ->name('execute-transfer');
-
-            // NOUVELLE ROUTE: Annuler un transfert programmé (optionnel)
-            Route::post('/{id}/cancel-transfer', [FundingValidationController::class, 'cancelTransfer'])
-                ->name('cancel-transfer');
-
-            // === FINALISATION ===
-            Route::post('/{id}/complete', [FundingValidationController::class, 'completeRequest'])
-                ->name('complete');
-
-            // === VALIDATION DES PAIEMENTS ===
-            Route::post('/payments/{paymentId}/verify', [FundingValidationController::class, 'verifyPayment'])
-                ->name('verify-payment');
+            Route::get('/pending-validation', [FundingValidationController::class, 'pendingValidation'])->name('pending-validation');
+            Route::get('/pending-transfers', [FundingValidationController::class, 'pendingTransfers'])->name('pending-transfers');
+            Route::get('/pending-payments', [FundingValidationController::class, 'pendingPayments'])->name('pending-payments');
+            Route::get('/{id}', [FundingValidationController::class, 'showRequest'])->name('show-request');
+            Route::post('/{id}/set-price', [FundingValidationController::class, 'setPrice'])->name('set-price');
+            Route::post('/{id}/under-review', [FundingValidationController::class, 'setUnderReview'])->name('under-review');
+            Route::post('/{id}/reject', [FundingValidationController::class, 'rejectRequest'])->name('reject-request');
+            Route::post('/{id}/approve-predefined', [FundingValidationController::class, 'approvePredefined'])->name('approve-predefined');
+            Route::post('/{id}/check-documents', [FundingValidationController::class, 'checkDocuments'])->name('check-documents');
+            Route::post('/{id}/verify-and-schedule', [FundingValidationController::class, 'verifyMissingDocumentsAndScheduleTransfer'])->name('verify-and-schedule');
+            Route::post('/{id}/execute-transfer', [FundingValidationController::class, 'executeTransfer'])->name('execute-transfer');
+            Route::post('/{id}/cancel-transfer', [FundingValidationController::class, 'cancelTransfer'])->name('cancel-transfer');
+            Route::post('/{id}/complete', [FundingValidationController::class, 'completeRequest'])->name('complete');
+            Route::post('/payments/{paymentId}/verify', [FundingValidationController::class, 'verifyPayment'])->name('verify-payment');
         });
 
-        // --- DOCUMENT MANAGEMENT ---
+        // Documents
         Route::prefix('documents')->name('documents.')->group(function () {
             Route::get('/', [AdminDocumentController::class, 'index'])->name('index');
             Route::post('/bulk-validate', [AdminDocumentController::class, 'bulkValidate'])->name('bulk-validate');
             Route::post('/user/{userId}/validate-all', [AdminDocumentController::class, 'validateUserDocuments'])->name('validate-user');
-
             Route::get('/user/{userId}', [AdminDocumentController::class, 'show'])->name('show');
             Route::get('/{id}/download', [AdminDocumentController::class, 'download'])->name('download');
             Route::post('/{id}/validate', [AdminDocumentController::class, 'validateDocument'])->name('validate');
@@ -510,27 +439,44 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/{id}/pending', [AdminDocumentController::class, 'pending'])->name('pending');
         });
 
-        // --- TRAINING MANAGEMENT ---
-        Route::prefix('training')->name('trainings.')->group(function () {
+        // Required Documents
+        Route::prefix('required-documents')->name('required-documents.')->group(function () {
+            Route::get('/', [RequiredDocumentController::class, 'index'])->name('index');
+            Route::get('/create', [RequiredDocumentController::class, 'create'])->name('create');
+            Route::post('/', [RequiredDocumentController::class, 'store'])->name('store');
+            Route::get('/{requiredDocument}/edit', [RequiredDocumentController::class, 'edit'])->name('edit');
+            Route::put('/{requiredDocument}', [RequiredDocumentController::class, 'update'])->name('update');
+            Route::delete('/{requiredDocument}', [RequiredDocumentController::class, 'destroy'])->name('destroy');
+            Route::post('/{requiredDocument}/toggle-status', [RequiredDocumentController::class, 'toggleStatus'])->name('toggle-status');
+        });
+
+        // Trainings
+        Route::prefix('trainings')->name('trainings.')->group(function () {
             Route::get('/', [AdminTrainingController::class, 'index'])->name('index');
             Route::get('/create', [AdminTrainingController::class, 'create'])->name('create');
             Route::post('/', [AdminTrainingController::class, 'store'])->name('store');
+            Route::get('/{training}/edit', [AdminTrainingController::class, 'edit'])->name('edit');
+            Route::put('/{training}', [AdminTrainingController::class, 'update'])->name('update');
+            Route::delete('/{training}', [AdminTrainingController::class, 'destroy'])->name('destroy');
         });
 
-        // --- ADMIN SUPPORT ---
+        // Support
         Route::prefix('support')->name('support.')->group(function () {
             Route::get('/', [AdminSupportController::class, 'index'])->name('index');
-            Route::get('/{id}', [AdminSupportController::class, 'show'])->name('show');
-            Route::post('/{id}/reply', [AdminSupportController::class, 'reply'])->name('reply');
+            Route::get('/{ticket}', [AdminSupportController::class, 'show'])->name('show');
+            Route::post('/{ticket}/reply', [AdminSupportController::class, 'reply'])->name('reply');
+            Route::post('/{ticket}/close', [AdminSupportController::class, 'close'])->name('close');
+            Route::post('/{ticket}/assign', [AdminSupportController::class, 'assign'])->name('assign');
         });
 
-        // --- REPORTS ---
+        // Reports
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/', [ReportController::class, 'index'])->name('index');
             Route::get('/generate', [ReportController::class, 'generate'])->name('generate');
+            Route::get('/export', [ReportController::class, 'export'])->name('export');
         });
 
-        // --- SYSTEM SETTINGS ---
+        // Settings
         Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/', [SettingController::class, 'index'])->name('index');
             Route::put('/', [SettingController::class, 'update'])->name('update');
@@ -540,22 +486,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| API Routes (routes/api.php alternative)
+| API Routes
 |--------------------------------------------------------------------------
 */
 
 Route::prefix('api')->name('api.')->group(function () {
-    // Public API
     Route::get('/statistics', [StatController::class, 'index'])->name('stats');
     Route::post('/contact', [ContactController::class, 'store'])->name('contact');
     Route::get('/programs', [ProgramController::class, 'index'])->name('programs');
 
-    // Authenticated API
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/user', function (Request $request) {
             return $request->user();
         });
-
         Route::get('/wallet/balance', [ApiWalletController::class, 'balance']);
         Route::post('/wallet/deposit', [ApiWalletController::class, 'deposit']);
         Route::post('/wallet/withdraw', [ApiWalletController::class, 'withdraw']);
@@ -575,7 +518,7 @@ Route::get('/offline', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Static Pages Routes
+| Static Pages
 |--------------------------------------------------------------------------
 */
 
@@ -625,13 +568,7 @@ Route::get('/cgu', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Compatibility and Redirect Routes
-|--------------------------------------------------------------------------
-*/
-
-/*
-|--------------------------------------------------------------------------
-| Test and Development Routes
+| Test Routes (Local Only)
 |--------------------------------------------------------------------------
 */
 
@@ -651,7 +588,7 @@ if (app()->environment('local')) {
 
 /*
 |--------------------------------------------------------------------------
-| Maintenance Routes
+| Maintenance & Fallback
 |--------------------------------------------------------------------------
 */
 
@@ -661,12 +598,6 @@ Route::get('/maintenance', function () {
     }
     return view('maintenance');
 })->name('maintenance');
-
-/*
-|--------------------------------------------------------------------------
-| Fallback Route for 404 Pages
-|--------------------------------------------------------------------------
-*/
 
 Route::fallback(function () {
     return view('errors.404');

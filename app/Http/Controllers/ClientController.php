@@ -24,7 +24,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Auth\Events\PasswordReset; 
+use Illuminate\Auth\Events\PasswordReset;
+
+use Illuminate\Support\Facades\Mail;
+use App\Mail\CustomVerifyEmail;
+use App\Mail\CustomResetPassword;
 use Illuminate\Support\Str;
 
 class ClientController extends Controller
@@ -64,9 +68,6 @@ class ClientController extends Controller
             'message' => 'required|string',
         ]);
 
-        // Envoyer l'email
-        // Mail::to('contact@bhdm-bii.org')->send(new ContactMail($validated));
-
         return redirect()->back()->with('success', 'Votre message a été envoyé avec succès !');
     }
 
@@ -75,138 +76,128 @@ class ClientController extends Controller
         return view('auth.login');
     }
 
-public function login(Request $request)
-{
-    $credentials = $request->validate([
-        'email' => 'required|email',
-        'password' => 'required',
-        'remember' => 'boolean',
-    ]);
-
-    // Récupérer l'utilisateur par email pour vérifications AVANT authentification
-    $user = \App\Models\User::where('email', $credentials['email'])->first();
-
-    // Vérifier si l'utilisateur existe
-    if (!$user) {
-        return back()
-            ->withInput($request->only('email'))
-            ->withErrors(['email' => 'Ces identifiants ne correspondent pas à nos enregistrements.']);
-    }
-
-    //  VÉRIFICATION CRITIQUE : Compte désactivé (is_active = 0)
-    if (!$user->is_active) {
-        Log::warning('Tentative de connexion sur compte désactivé', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'ip' => $request->ip(),
+    public function login(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+            'remember' => 'boolean',
         ]);
 
-        return back()
-            ->withInput($request->only('email'))
-            ->withErrors(['email' => 'Votre compte a été désactivé. Veuillez contacter l\'administrateur.']);
-    }
+        $user = \App\Models\User::where('email', $credentials['email'])->first();
 
-    // Vérifier si l'utilisateur est un admin (redirection vers portail admin)
-    if ($user->is_admin || $user->member_type === 'admin') {
-        return redirect()->route('admin.login')
-            ->with('info', 'Veuillez utiliser le portail administrateur pour vous connecter.');
-    }
+        if (!$user) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Ces identifiants ne correspondent pas à nos enregistrements.']);
+        }
 
-    // Tentative d'authentification pour les clients uniquement
-    if (!Auth::attempt($credentials, $request->boolean('remember'))) {
-        Log::info('Échec de connexion client', [
-            'email' => $credentials['email'],
-            'ip' => $request->ip(),
-        ]);
+        if (!$user->is_active) {
+            Log::warning('Tentative de connexion sur compte désactivé', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'ip' => $request->ip(),
+            ]);
 
-        return back()
-            ->withInput($request->only('email'))
-            ->withErrors(['email' => 'Les identifiants sont incorrects.']);
-    }
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Votre compte a été désactivé. Veuillez contacter l\'administrateur.']);
+        }
 
-    $request->session()->regenerate();
+        if ($user->is_admin || $user->member_type === 'admin') {
+            return redirect()->route('admin.login')
+                ->with('info', 'Veuillez utiliser le portail administrateur pour vous connecter.');
+        }
 
-    $authenticatedUser = Auth::user();
+        if (!Auth::attempt($credentials, $request->boolean('remember'))) {
+            Log::info('Échec de connexion client', [
+                'email' => $credentials['email'],
+                'ip' => $request->ip(),
+            ]);
 
-    // Vérification double du statut actif
-    if (!$authenticatedUser->is_active) {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Les identifiants sont incorrects.']);
+        }
 
-        return back()
-            ->withInput($request->only('email'))
-            ->withErrors(['email' => 'Votre compte a été désactivé.']);
-    }
+        $request->session()->regenerate();
 
-    // Mise à jour des informations de connexion
-    try {
-        $authenticatedUser->update([
-            'last_login_at' => now(),
-            'last_login_ip' => $request->ip(),
-            'last_login_device' => $request->userAgent(),
-        ]);
-    } catch (\Exception $e) {
-        Log::error('Erreur mise à jour last_login', [
+        $authenticatedUser = Auth::user();
+
+        if (!$authenticatedUser->is_active) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Votre compte a été désactivé.']);
+        }
+
+        try {
+            $authenticatedUser->update([
+                'last_login_at' => now(),
+                'last_login_ip' => $request->ip(),
+                'last_login_device' => $request->userAgent(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur mise à jour last_login', [
+                'user_id' => $authenticatedUser->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            \App\Models\Notification::create([
+                'user_id' => $authenticatedUser->id,
+                'type' => 'security',
+                'title' => 'Nouvelle connexion détectée',
+                'message' => 'Connexion depuis ' . $request->ip() . ' le ' . now()->format('d/m/Y à H:i'),
+                'is_read' => false,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur création notification', ['error' => $e->getMessage()]);
+        }
+
+        session([
             'user_id' => $authenticatedUser->id,
-            'error' => $e->getMessage(),
+            'user_member_type' => $authenticatedUser->member_type,
+            'user_full_name' => $authenticatedUser->full_name,
+            'user_profile_photo' => $authenticatedUser->profile_photo_url,
+            'login_time' => now()->toDateTimeString(),
         ]);
-    }
 
-    // Notification de connexion
-    try {
-        \App\Models\Notification::create([
+        Log::info('Connexion client réussie', [
             'user_id' => $authenticatedUser->id,
-            'type' => 'security',
-            'title' => 'Nouvelle connexion détectée',
-            'message' => 'Connexion depuis ' . $request->ip() . ' le ' . now()->format('d/m/Y à H:i'),
-            'is_read' => false,
+            'email' => $authenticatedUser->email,
         ]);
-    } catch (\Exception $e) {
-        Log::error('Erreur création notification', ['error' => $e->getMessage()]);
+
+        // Vérifier si l'utilisateur vient de compléter ses documents et veut faire une demande
+        if (session('redirect_to_request_after_documents')) {
+            session()->forget('redirect_to_request_after_documents');
+            return redirect()->route('client.requests.create');
+        }
+
+        return redirect()->intended('client/dashboard');
     }
 
-    // Stockage session
-    session([
-        'user_id' => $authenticatedUser->id,
-        'user_member_type' => $authenticatedUser->member_type,
-        'user_full_name' => $authenticatedUser->full_name,
-        'user_profile_photo' => $authenticatedUser->profile_photo_url,
-        'login_time' => now()->toDateTimeString(),
-    ]);
+    private function determineRedirect(\App\Models\User $user): string
+    {
+        if ($user->getCompletionPercentage() < 50) {
+            return route('client.profile.complete');
+        }
 
-    Log::info('Connexion client réussie', [
-        'user_id' => $authenticatedUser->id,
-        'email' => $authenticatedUser->email,
-    ]);
+        // MODIFIÉ : Utilise hasSubmittedRequiredDocuments au lieu de hasUploadedRequiredDocuments
+        if (!$user->hasSubmittedRequiredDocuments()) {
+            return route('client.documents.upload');
+        }
 
-    return redirect()->intended('client/dashboard');
-}
+        if (!$user->is_verified || !$user->email_verified_at) {
+            return route('client.verification.notice');
+        }
 
-/**
- * Détermine la redirection selon le profil utilisateur
- */
-private function determineRedirect(\App\Models\User $user): string
-{
-    // Si profil incomplet, rediriger vers complétion
-    if ($user->getCompletionPercentage() < 50) {
-        return route('client.profile.complete');
+        return route('client.dashboard');
     }
-
-    // Si documents requis manquants
-    if (!$user->hasUploadedRequiredDocuments()) {
-        return route('client.documents.upload');
-    }
-
-    // Si email non vérifié
-    if (!$user->is_verified || !$user->email_verified_at) {
-        return route('client.verification.notice');
-    }
-
-    // Redirection par défaut
-    return route('client.dashboard');
-}
-
 
     public function showRegisterForm()
     {
@@ -216,7 +207,6 @@ private function determineRedirect(\App\Models\User $user): string
 
         return view('auth.register', compact('fundingTypes'));
     }
-
 
     public function register(Request $request)
     {
@@ -252,7 +242,6 @@ private function determineRedirect(\App\Models\User $user): string
         ];
 
         try {
-            // ================= VALIDATION CONDITIONNELLE =================
             $rules = [
                 'account_type' => 'required|in:particulier,entreprise',
                 'name' => 'required|string|max:255',
@@ -265,7 +254,6 @@ private function determineRedirect(\App\Models\User $user): string
                 'terms' => 'required|accepted',
             ];
 
-            // Ajouter les règles spécifiques aux entreprises uniquement si c'est une entreprise
             if ($request->input('account_type') === 'entreprise') {
                 $rules = array_merge($rules, [
                     'company_name' => 'required|string|max:255',
@@ -292,7 +280,6 @@ private function determineRedirect(\App\Models\User $user): string
         DB::beginTransaction();
 
         try {
-            // ================= USER =================
             $nameParts = explode(' ', $validated['name'], 2);
 
             $userData = [
@@ -307,13 +294,13 @@ private function determineRedirect(\App\Models\User $user): string
                 'password' => Hash::make($validated['password']),
                 'member_type' => $validated['account_type'],
                 'member_id' => $this->generateMemberId(),
+                'profile_photo'=> 'images/avatar.png',
                 'is_active' => true,
                 'is_verified' => false,
                 'member_status' => 'pending',
                 'member_since' => now(),
             ];
 
-            // Ajouter les champs entreprise uniquement si c'est une entreprise
             if ($validated['account_type'] === 'entreprise') {
                 $userData = array_merge($userData, [
                     'company_name' => $validated['company_name'],
@@ -327,7 +314,6 @@ private function determineRedirect(\App\Models\User $user): string
 
             Log::info('Utilisateur créé', ['user_id' => $user->id, 'type' => $validated['account_type']]);
 
-            // ================= WALLET (Pour tous) =================
             $wallet = Wallet::create([
                 'user_id' => $user->id,
                 'wallet_number' => $this->generateWalletNumber(),
@@ -336,7 +322,6 @@ private function determineRedirect(\App\Models\User $user): string
                 'pin_hash' => Hash::make('000000'),
             ]);
 
-            // ================= ENTREPRISE UNIQUEMENT =================
             if ($validated['account_type'] === 'entreprise') {
                 try {
                     $entrepriseRules = [
@@ -351,7 +336,6 @@ private function determineRedirect(\App\Models\User $user): string
 
                     Log::info('Validation projet entreprise', $entrepriseData);
 
-                    // Création de la demande de financement uniquement si une offre est sélectionnée
                     if (!empty($entrepriseData['funding_type_id'])) {
                         $type = FundingType::find($entrepriseData['funding_type_id']);
 
@@ -367,7 +351,8 @@ private function determineRedirect(\App\Models\User $user): string
                                 'amount_requested' => $entrepriseData['funding_needed'] ?? $type->amount ?? 0,
                                 'duration' => $entrepriseData['duration'] ?? 12,
                                 'expected_payment' => $type->registration_fee ?? 0,
-                                'status' => 'pending',
+                                'status' => 'pending_payment',
+                                'pending_payment'=> 'Frais d inscription',
                                 'local_committee_country' => $user->country,
                                 'project_location' => $user->city . ', ' . $user->country,
                                 'expected_jobs' => 0,
@@ -455,7 +440,6 @@ private function determineRedirect(\App\Models\User $user): string
         do {
             $attempt++;
 
-            // Utilisation d'un verrou pour éviter les conflits
             $lastRequest = \DB::table('funding_requests')
                 ->whereYear('created_at', $currentYear)
                 ->lockForUpdate()
@@ -465,7 +449,6 @@ private function determineRedirect(\App\Models\User $user): string
             $nextNumber = $lastRequest ? intval(substr($lastRequest->request_number, -6)) + 1 : 1;
             $requestNumber = 'REQ-' . $currentYear . '-' . str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
 
-            // Vérifier si ce numéro n'existe pas déjà (double sécurité)
             $exists = DB::table('funding_requests')
                 ->where('request_number', $requestNumber)
                 ->exists();
@@ -474,101 +457,82 @@ private function determineRedirect(\App\Models\User $user): string
                 return $requestNumber;
             }
 
-            // Si existe, attendre un peu et réessayer avec un nouveau numéro
-            usleep(100000); // 100ms
+            usleep(100000);
             $nextNumber++;
         } while ($attempt < $maxAttempts);
 
-        // Fallback: utiliser un timestamp + random pour garantir l'unicité
         $timestamp = now()->format('YmdHis');
         $random = strtoupper(substr(uniqid(), -4));
         return 'REQ-' . $currentYear . '-' . $timestamp . '-' . $random;
     }
 
-      public function sendResetLink(Request $request)
+    public function sendResetLink(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $user = User::where('email', $request->email)->first();
+
+        if ($user) {
+            $token = Password::createToken($user);
+            Mail::to($user->email)->send(new CustomResetPassword($user, $token));
+
+            return back()->with('success', 'Nous vous avons envoyé un lien de réinitialisation par email.');
+        }
+
+        return back()->with('error', 'Aucun compte trouvé avec cette adresse email.');
+    }
+
+    public function resetPassword(Request $request)
     {
         $request->validate([
-            'email' => 'required|email|exists:users,email'
+            'token' => 'required|string',
+            'email' => 'required|email',
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/[A-Z]/',
+                'regex:/[a-z]/',
+                'regex:/[0-9]/',
+                'regex:/[!@#$%^&*(),.?":{}|<>]/'
+            ],
         ], [
-            'email.exists' => 'Cette adresse email n\'est pas enregistrée.'
+            'password.regex' => 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial.',
+            'password.confirmed' => 'Les mots de passe ne correspondent pas.'
         ]);
 
-        // Supprimer les anciens tokens pour cet email (évite les conflits)
-        \DB::table('password_resets')->where('email', $request->email)->delete();
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                ])->save();
 
-        $status = Password::sendResetLink(
-            $request->only('email')
+                event(new \Illuminate\Auth\Events\PasswordReset($user));
+            }
         );
 
-        \Log::info('Envoi lien reset', [
+        Log::info('Tentative reset password', [
             'email' => $request->email,
-            'status' => $status,
-            'token_exists' => \DB::table('password_resets')->where('email', $request->email)->exists()
+            'status' => $status
         ]);
 
-        return $status === Password::RESET_LINK_SENT
-            ? back()->with(['status' => 'Un lien de réinitialisation a été envoyé à votre adresse email.'])
-            : back()->withErrors(['email' => 'Impossible d\'envoyer le lien. Veuillez réessayer.']);
-    }
-
-    
-  /**
- * Réinitialiser le mot de passe - VERSION CORRIGÉE ET SIMPLIFIÉE
- */
-public function resetPassword(Request $request)
-{
-    $request->validate([
-        'token' => 'required|string',
-        'email' => 'required|email',
-        'password' => [
-            'required',
-            'string',
-            'min:8',
-            'confirmed',
-            'regex:/[A-Z]/',      
-            'regex:/[a-z]/',      
-            'regex:/[0-9]/',      
-            'regex:/[!@#$%^&*(),.?":{}|<>]/'  
-        ],
-    ], [
-        'password.regex' => 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial.',
-        'password.confirmed' => 'Les mots de passe ne correspondent pas.'
-    ]);
-
-    // Utiliser le PasswordBroker de Laravel (méthode standard)
-    $status = Password::reset(
-        $request->only('email', 'password', 'password_confirmation', 'token'),
-        function ($user, $password) {
-            $user->forceFill([
-                'password' => Hash::make($password),
-                'remember_token' => Str::random(60),
-            ])->save();
-
-            // Événement Laravel standard
-            event(new \Illuminate\Auth\Events\PasswordReset($user));
+        if ($status === Password::PASSWORD_RESET) {
+            return redirect()
+                ->route('login')
+                ->with('status', 'Votre mot de passe a été réinitialisé avec succès !');
         }
-    );
 
-    Log::info('Tentative reset password', [
-        'email' => $request->email,
-        'status' => $status
-    ]);
-
-    if ($status === Password::PASSWORD_RESET) {
-        return redirect()
-            ->route('login')
-            ->with('status', 'Votre mot de passe a été réinitialisé avec succès !');
+        return back()
+            ->withInput()
+            ->withErrors(['email' => match($status) {
+                Password::INVALID_TOKEN => 'Le lien de réinitialisation est invalide ou a expiré.',
+                Password::INVALID_USER => 'Aucun utilisateur trouvé avec cet email.',
+                default => 'Une erreur est survenue lors de la réinitialisation.'
+            }]);
     }
-
-    // Si échec, retourner avec erreur
-    return back()
-        ->withInput()
-        ->withErrors(['email' => match($status) {
-            Password::INVALID_TOKEN => 'Le lien de réinitialisation est invalide ou a expiré.',
-            Password::INVALID_USER => 'Aucun utilisateur trouvé avec cet email.',
-            default => 'Une erreur est survenue lors de la réinitialisation.'
-        }]);
-}
 
     public function submitTest(Request $request)
     {
@@ -628,9 +592,19 @@ public function resetPassword(Request $request)
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * Affiche le formulaire de création de demande avec redirection intelligente
+     * MODIFIÉ : Accepte les documents en attente (pending) ou validés (validated)
+     */
     public function createRequest()
     {
         $user = Auth::user();
+
+        // MODIFIÉ : Vérifie si l'utilisateur a soumis ses documents (pending ou validated)
+        if (!$user->hasSubmittedRequiredDocuments()) {
+            return redirect()->route('client.documents.index')
+                ->with('warning', 'Veuillez d\'abord télécharger vos documents requis avant de faire une demande.');
+        }
 
         // Pour les entreprises, pré-remplir avec les informations du projet initial
         if ($user->isEntreprise()) {
@@ -649,9 +623,19 @@ public function resetPassword(Request $request)
         return view('client.requests.create');
     }
 
+    /**
+     * Stocke une nouvelle demande de financement
+     * MODIFIÉ : Accepte les documents en attente (pending) ou validés (validated)
+     */
     public function storeRequest(Request $request)
     {
         $user = Auth::user();
+
+        // MODIFIÉ : Vérifie que les documents sont soumis (même en attente)
+        if (!$user->hasSubmittedRequiredDocuments()) {
+            return redirect()->route('client.documents.index')
+                ->with('error', 'Vous devez d\'abord télécharger vos documents requis.');
+        }
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -674,40 +658,60 @@ public function resetPassword(Request $request)
             $validated = array_merge($validated, $entrepriseData);
         }
 
-        $fundingRequest = FundingRequest::create(array_merge([
-            'user_id' => $user->id,
-            'title' => $validated['title'],
-            'description' => $validated['description'],
-            'amount_requested' => $validated['amount'],
-            'category' => $validated['category'],
-            'project_duration' => $validated['project_duration'],
-            'expected_result' => $validated['expected_result'],
-            'status' => 'pending',
-            'reference' => 'BHDM-' . date('Ymd') . '-' . str_pad(FundingRequest::count() + 1, 4, '0', STR_PAD_LEFT),
-        ], $user->isEntreprise() ? [
-            'expected_jobs' => $validated['expected_jobs'],
-            'expected_revenue' => $validated['expected_revenue'] ?? 0,
-            'project_type' => $validated['project_type'],
-        ] : []));
+        DB::beginTransaction();
 
-        if ($request->hasFile('business_plan')) {
-            $filename = time() . '_business_plan.' . $request->business_plan->extension();
-            $path = $request->business_plan->storeAs('public/business_plans', $filename);
+        try {
+            $fundingRequest = FundingRequest::create(array_merge([
+                'user_id' => $user->id,
+                'request_number' => $this->generateRequestNumber(),
+                'title' => $validated['title'],
+                'description' => $validated['description'],
+                'amount_requested' => $validated['amount'],
+                'category' => $validated['category'],
+                'project_duration' => $validated['project_duration'],
+                'expected_result' => $validated['expected_result'],
+                'status' => 'pending',
+                'reference' => 'BHDM-' . date('Ymd') . '-' . str_pad(FundingRequest::count() + 1, 4, '0', STR_PAD_LEFT),
+            ], $user->isEntreprise() ? [
+                'expected_jobs' => $validated['expected_jobs'],
+                'expected_revenue' => $validated['expected_revenue'] ?? 0,
+                'project_type' => $validated['project_type'],
+            ] : []));
 
-            $fundingRequest->update([
-                'business_plan' => $filename,
+            if ($request->hasFile('business_plan')) {
+                $filename = time() . '_business_plan.' . $request->business_plan->extension();
+                $path = $request->business_plan->storeAs('public/business_plans', $filename);
+
+                $fundingRequest->update([
+                    'business_plan' => $filename,
+                ]);
+            }
+
+            // Créer une notification pour l'utilisateur
+            Notification::create([
+                'user_id' => $user->id,
+                'type' => 'request',
+                'title' => 'Nouvelle demande créée',
+                'message' => 'Votre demande "' . $validated['title'] . '" a été créée avec succès et est en attente de validation.',
+                'data' => ['request_id' => $fundingRequest->id],
+                'is_read' => false,
             ]);
+
+            DB::commit();
+
+            // Redirection avec message de succès et option pour voir la demande
+            return redirect()->route('client.requests.show', $fundingRequest->id)
+                ->with('success', 'Votre demande de financement a été créée avec succès !');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Erreur création demande', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return back()->with('error', 'Une erreur est survenue lors de la création de la demande.')->withInput();
         }
-
-        Notification::create([
-            'user_id' => $user->id,
-            'type' => 'request',
-            'title' => 'Nouvelle demande créée',
-            'message' => 'Votre demande "' . $validated['title'] . '" a été créée avec succès.',
-            'data' => ['request_id' => $fundingRequest->id],
-        ]);
-
-        return redirect()->route('client.requests')->with('success', 'Demande créée avec succès !');
     }
 
     public function showRequest($id)
@@ -782,8 +786,6 @@ public function resetPassword(Request $request)
         return redirect()->route('client.requests')->with('success', 'Demande supprimée avec succès !');
     }
 
-
-
     /**
      * Afficher la liste des documents
      */
@@ -806,7 +808,7 @@ public function resetPassword(Request $request)
 
         foreach ($requiredDocuments as $requiredDoc) {
             $exists = $documents->where('type', $requiredDoc->document_type)
-                ->where('status', 'validated')
+                ->whereIn('status', ['pending', 'validated']) // MODIFIÉ : Accepte pending et validated
                 ->where(function ($query) use ($requiredDoc) {
                     if ($requiredDoc->has_expiry_date) {
                         $query->where('is_expired', false)
@@ -864,7 +866,7 @@ public function resetPassword(Request $request)
         $existingDocument = Document::where('user_id', $user->id)
             ->where('type', $type)
             ->where('is_profile_document', true)
-            ->whereIn('status', ['pending', 'validated'])
+            ->whereIn('status', ['pending', 'validated']) // MODIFIÉ
             ->first();
 
         return view('client.documents.upload', [
@@ -876,7 +878,8 @@ public function resetPassword(Request $request)
     }
 
     /**
-     * Traiter l'upload d'un document
+     * Traiter l'upload d'un document - VERSION MODIFIÉE AVEC REDIRECTION INTELLIGENTE
+     * MODIFIÉ : Accepte les documents en attente pour débloquer les fonctionnalités
      */
     public function uploadDocument(Request $request)
     {
@@ -905,29 +908,24 @@ public function resetPassword(Request $request)
                 ->with('error', 'Type de document non autorisé pour votre profil.');
         }
 
-        // Vérifier les doublons (validés)
-        $existingValidatedDocument = Document::where('user_id', $user->id)
+        // Vérifier les doublons (validés ou en attente)
+        $existingValidDocument = Document::where('user_id', $user->id)
             ->where('type', $documentType)
             ->where('is_profile_document', true)
-            ->where('status', 'validated')
-            ->where('is_expired', false)
+            ->whereIn('status', ['pending', 'validated']) // MODIFIÉ
+            ->where(function ($query) use ($documentInfo) {
+                if ($documentInfo->has_expiry_date) {
+                    $query->where(function ($q) {
+                        $q->whereNull('expiry_date')
+                            ->orWhere('expiry_date', '>', now());
+                    });
+                }
+            })
             ->first();
 
-        if ($existingValidatedDocument) {
+        if ($existingValidDocument) {
             return redirect()->route('client.documents.index')
-                ->with('error', 'Vous avez déjà un document de ce type validé et non expiré.');
-        }
-
-        // Vérifier s'il y a un document en attente
-        $existingPendingDocument = Document::where('user_id', $user->id)
-            ->where('type', $documentType)
-            ->where('is_profile_document', true)
-            ->where('status', 'pending')
-            ->first();
-
-        if ($existingPendingDocument) {
-            return redirect()->route('client.documents.index')
-                ->with('warning', 'Vous avez déjà un document de ce type en attente de validation.');
+                ->with('error', 'Vous avez déjà un document de ce type soumis ou en attente.');
         }
 
         // Validation spécifique au document
@@ -942,7 +940,7 @@ public function resetPassword(Request $request)
 
         // Validation de la taille
         if ($documentInfo->max_size_mb) {
-            $maxSizeKB = $documentInfo->max_size_mb * 1024; // Convertir en Ko
+            $maxSizeKB = $documentInfo->max_size_mb * 1024;
             $validationRules['document'][] = "max:$maxSizeKB";
         }
 
@@ -1029,8 +1027,29 @@ public function resetPassword(Request $request)
                 ]);
             }
 
+            // VÉRIFICATION CLÉ : Si tous les documents requis sont maintenant soumis (pending ou validated)
+            $hasAllDocuments = $user->hasSubmittedRequiredDocuments();
+
+            if ($hasAllDocuments) {
+                // Mettre à jour le statut de l'utilisateur si nécessaire
+                if ($user->member_status === 'pending_documents') {
+                    $user->update(['member_status' => 'pending_validation']);
+                }
+
+                // Redirection vers la création de demande avec message de succès
+                return redirect()->route('client.requests.create')
+                    ->with('success', 'Excellent ! Vos documents ont été uploadés avec succès. Vous pouvez maintenant créer votre demande de financement.')
+                    ->with('show_request_welcome', true);
+            }
+
+            // Sinon, rediriger vers la liste des documents pour continuer
+            $remainingDocuments = $user->getMissingSubmittedRequiredDocuments(); // MODIFIÉ
+            $remainingCount = count($remainingDocuments);
+
             return redirect()->route('client.documents.index')
-                ->with('success', 'Document uploadé avec succès ! Il sera validé par notre équipe.');
+                ->with('success', 'Document uploadé avec succès ! Il sera validé par notre équipe.')
+                ->with('info', "Il vous reste {$remainingCount} document(s) à télécharger pour pouvoir faire une demande.");
+
         } catch (\Exception $e) {
             \Log::error('Erreur upload document: ' . $e->getMessage(), [
                 'user_id' => $user->id,
@@ -1671,7 +1690,6 @@ public function resetPassword(Request $request)
             'data' => ['ticket_id' => $ticket->id],
         ]);
 
-        // CORRECTION : route('support.index') au lieu de route('client.support')
         return redirect()->route('client.support.index')->with('success', 'Ticket créé avec succès !');
     }
 
@@ -1796,7 +1814,6 @@ public function resetPassword(Request $request)
             'data' => ['ticket_id' => $ticket->id],
         ]);
 
-        // CORRECTION : route explicite au lieu de back()
         return redirect()->route('client.support.show', $id)->with('success', 'Ticket fermé avec succès !');
     }
 
@@ -1819,7 +1836,6 @@ public function resetPassword(Request $request)
             'data' => ['ticket_id' => $ticket->id],
         ]);
 
-        // CORRECTION : route explicite au lieu de back()
         return redirect()->route('client.support.show', $id)->with('success', 'Ticket rouvert avec succès !');
     }
 
@@ -1841,43 +1857,36 @@ public function resetPassword(Request $request)
         try {
             $user = Auth::user();
 
-            // Récupérer le ticket avec vérification d'appartenance
             $ticket = SupportTicket::where('user_id', $user->id)
                 ->findOrFail($ticketId);
 
-            // Récupérer le message spécifique au ticket
             $message = $ticket->messages()
                 ->where('id', $messageId)
                 ->firstOrFail();
 
-            // Vérifier les pièces jointes
             if (! $message->hasAttachments()) {
                 abort(404, 'Aucune pièce jointe trouvée pour ce message.');
             }
 
             $attachments = $message->attachments;
 
-            // Vérifier que l'index existe et est valide
             if (! isset($attachments[$attachmentIndex])) {
                 abort(404, 'Pièce jointe introuvable (index: ' . $attachmentIndex . ')');
             }
 
             $attachment = $attachments[$attachmentIndex];
 
-            // Validation des données de la pièce jointe
             if (! isset($attachment['path']) || empty($attachment['path'])) {
                 abort(404, 'Chemin de fichier invalide.');
             }
 
             $filePath = storage_path('app/public/' . $attachment['path']);
 
-            // Vérifier l'existence physique du fichier
             if (! file_exists($filePath)) {
                 Log::error('Fichier introuvable: ' . $filePath);
                 abort(404, 'Le fichier n\'existe plus sur le serveur.');
             }
 
-            // Retourner le téléchargement avec le nom original
             return response()->download(
                 $filePath,
                 $attachment['name'] ?? basename($attachment['path']),
@@ -1972,7 +1981,6 @@ public function resetPassword(Request $request)
 
         $ticket->delete();
 
-        // CORRECTION : route('support.index') au lieu de route('client.support')
         return redirect()->route('support.index')->with('success', 'Ticket supprimé avec succès !');
     }
 
@@ -2053,7 +2061,23 @@ public function resetPassword(Request $request)
     public function settings()
     {
         $user = Auth::user();
-        $userSettings = $user->settings ?? new Setting;
+        
+        $userSettings = Setting::firstOrCreate(
+            ['user_id' => $user->id],
+            [
+                'notification_email' => true,
+                'notification_sms' => false,
+                'notification_push' => true,
+                'newsletter_subscribed' => true,
+                'two_factor_auth' => false,
+                'language' => 'fr',
+                'timezone' => 'Africa/Abidjan',
+                'date_format' => 'd/m/Y',
+                'currency' => 'XOF',
+                'theme' => 'light',
+                'auto_logout_time' => 30,
+            ]
+        );
 
         return view('client.settings', compact('user', 'userSettings'));
     }
@@ -2070,20 +2094,19 @@ public function resetPassword(Request $request)
             'two_factor_auth' => 'nullable|boolean',
             'language' => 'required|in:fr,en,es',
             'timezone' => 'required|timezone',
-            'date_format' => 'required|in:d/m/Y,m/d/Y,Y-m/d',
+            'date_format' => 'required|in:d/m/Y,m/d/Y,Y-m-d',
             'currency' => 'required|in:XOF,EUR,USD',
             'theme' => 'nullable|in:light,dark',
             'auto_logout_time' => 'nullable|integer|in:15,30,60,120',
         ]);
 
-        // Gestion des checkboxes (convertir "1" en true et null/false en false)
         $settings = [
             'user_id' => $user->id,
-            'notification_email' => (bool) ($request->input('notification_email', 0)),
-            'notification_sms' => (bool) ($request->input('notification_sms', 0)),
-            'notification_push' => (bool) ($request->input('notification_push', 0)),
-            'newsletter_subscribed' => (bool) ($request->input('newsletter_subscribed', 0)),
-            'two_factor_auth' => (bool) ($request->input('two_factor_auth', 0)),
+            'notification_email' => $request->has('notification_email'),
+            'notification_sms' => $request->has('notification_sms'),
+            'notification_push' => $request->has('notification_push'),
+            'newsletter_subscribed' => $request->has('newsletter_subscribed'),
+            'two_factor_auth' => $request->has('two_factor_auth'),
             'language' => $validated['language'],
             'timezone' => $validated['timezone'],
             'date_format' => $validated['date_format'],
@@ -2100,42 +2123,37 @@ public function resetPassword(Request $request)
         return redirect()->back()->with('success', 'Paramètres mis à jour avec succès !');
     }
 
-    /**
- * Déconnexion sécurisée avec redirection intelligente
- */
-public function logout(Request $request)
-{
-    $user = Auth::user();
-    $isAdmin = false;
-    
-    if ($user) {
-        // Déterminer si c'est un admin AVANT la déconnexion
-        $isAdmin = $user->is_admin || $user->member_type === 'admin';
-        
-        Log::info('Déconnexion utilisateur', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'is_admin' => $isAdmin,
-            'member_type' => $user->member_type,
-            'session_duration' => $request->session()->get('login_time') 
-                ? now()->diffInMinutes($request->session()->get('login_time')) . ' minutes'
-                : 'inconnue',
-        ]);
+    public function logout(Request $request)
+    {
+        $user = Auth::user();
+        $isAdmin = false;
+
+        if ($user) {
+            $isAdmin = $user->is_admin || $user->member_type === 'admin';
+
+            Log::info('Déconnexion utilisateur', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'is_admin' => $isAdmin,
+                'member_type' => $user->member_type,
+                'session_duration' => $request->session()->get('login_time')
+                    ? now()->diffInMinutes($request->session()->get('login_time')) . ' minutes'
+                    : 'inconnue',
+            ]);
+        }
+
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        if ($isAdmin) {
+            return redirect()->route('admin.login')
+                ->with('success', 'Vous avez été déconnecté de l\'espace administrateur.');
+        }
+
+        return redirect()->route('login')
+            ->with('success', 'Vous avez été déconnecté avec succès.');
     }
-
-    Auth::logout();
-    $request->session()->invalidate();
-    $request->session()->regenerateToken();
-
-    // Redirection différente selon le type d'utilisateur
-    if ($isAdmin) {
-        return redirect()->route('admin.login')
-            ->with('success', 'Vous avez été déconnecté de l\'espace administrateur.');
-    }
-
-    return redirect()->route('login')
-        ->with('success', 'Vous avez été déconnecté avec succès.');
-}
 
     /*
     |--------------------------------------------------------------------------
@@ -2171,6 +2189,9 @@ public function logout(Request $request)
         return response()->json($stats);
     }
 
+    /**
+     * MODIFIÉ : Vérifie les permissions avec hasSubmittedRequiredDocuments
+     */
     public function checkPermission(Request $request)
     {
         $permission = $request->input('permission');
@@ -2180,7 +2201,8 @@ public function logout(Request $request)
 
         switch ($permission) {
             case 'create_request':
-                $allowed = $user->status === 'active';
+                // MODIFIÉ : Utilise hasSubmittedRequiredDocuments au lieu de hasUploadedRequiredDocuments
+                $allowed = $user->status === 'active' && $user->hasSubmittedRequiredDocuments();
                 break;
             case 'make_deposit':
                 $allowed = $user->status === 'active';
@@ -2284,7 +2306,6 @@ public function logout(Request $request)
             'new_pin_confirmation' => 'required|string|size:6',
         ]);
 
-        // Si le wallet a déjà un PIN (pas le PIN par défaut), vérifier le PIN actuel
         if ($wallet->pin_hash && $wallet->pin_hash !== Hash::make('000000')) {
             if (! Hash::check($validated['current_pin'], $wallet->pin_hash)) {
                 return redirect()->back()->withErrors(['current_pin' => 'Le PIN actuel est incorrect.']);

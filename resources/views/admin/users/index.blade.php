@@ -100,6 +100,13 @@
             </form>
 
             <div class="toolbar-actions">
+                <a href="{{ route('admin.users.create-admin') }}" 
+                   class="btn-primary btn-add"
+                   title="Créer un administrateur">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Ajouter</span>
+                </a>
+                
                 <a href="{{ route('admin.users.export') }}?{{ http_build_query(request()->except('page')) }}"
                    class="btn-secondary btn-export"
                    title="Exporter en CSV">
@@ -279,6 +286,14 @@
                                                     </button>
                                                 @endif
                                             </li>
+                                            @if(!$user->transactions()->exists() && !$user->fundingRequests()->exists() && $user->id !== auth()->id())
+                                                <li>
+                                                    <button type="button" class="dropdown-item text-danger" onclick="openDeleteModal('{{ $user->id }}', '{{ $user->full_name }}')">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                        Supprimer définitivement
+                                                    </button>
+                                                </li>
+                                            @endif
                                         </ul>
                                     </div>
                                 </div>
@@ -378,6 +393,39 @@
                         <button type="submit" class="btn btn-success">
                             <i class="fa-solid fa-user-check"></i>
                             Activer
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de suppression -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-icon danger">
+                        <i class="fa-solid fa-trash"></i>
+                    </div>
+                    <h5 class="modal-title">Supprimer définitivement</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Êtes-vous sûr de vouloir supprimer définitivement le compte de <strong id="deleteUserName"></strong> ?</p>
+                    <div class="alert alert-danger">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>Cette action est irréversible. Toutes les données seront perdues.</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <form method="POST" action="" id="deleteForm" class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fa-solid fa-trash"></i>
+                            Supprimer
                         </button>
                     </form>
                 </div>
@@ -624,6 +672,7 @@
         cursor: pointer;
         transition: all 0.2s ease;
         border: none;
+        text-decoration: none;
     }
 
     .btn-primary {
@@ -648,9 +697,22 @@
         border-color: var(--color-gray-300);
     }
 
+    /* Bouton Ajouter spécifique */
+    .btn-add {
+        background: linear-gradient(135deg, var(--color-success), #059669);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-add:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    }
+
     .toolbar-actions {
         display: flex;
         gap: 12px;
+        align-items: center;
     }
 
     /* Active Filters */
@@ -997,11 +1059,6 @@
         color: var(--color-gray-900);
     }
 
-    .form-action {
-        display: inline;
-        margin: 0;
-    }
-
     /* Dropdown */
     .dropdown-menu {
         border: 1px solid var(--color-gray-200);
@@ -1077,6 +1134,11 @@
         color: #059669;
     }
 
+    .modal-icon.danger {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
     .modal-title {
         font-size: 1.25rem;
         font-weight: 700;
@@ -1134,6 +1196,11 @@
         color: #1e40af;
     }
 
+    .alert-danger {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
     .alert i {
         font-size: 1.25rem;
         flex-shrink: 0;
@@ -1182,6 +1249,16 @@
 
     .modal-footer .btn-success:hover {
         background: #059669;
+    }
+
+    .modal-footer .btn-danger {
+        background: var(--color-danger);
+        color: white;
+        border: none;
+    }
+
+    .modal-footer .btn-danger:hover {
+        background: #dc2626;
     }
 
     /* Empty State */
@@ -1331,6 +1408,30 @@
             width: 32px;
             height: 32px;
         }
+
+        .toolbar-actions {
+            width: 100%;
+            justify-content: stretch;
+        }
+        
+        .toolbar-actions .btn-primary,
+        .toolbar-actions .btn-secondary {
+            flex: 1;
+            justify-content: center;
+        }
+        
+        .btn-add span,
+        .btn-export span {
+            display: none;
+        }
+        
+        .btn-add,
+        .btn-export {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            justify-content: center;
+        }
     }
 
     @media (max-width: 480px) {
@@ -1433,6 +1534,15 @@
         document.getElementById('activateForm').action = '{{ route("admin.users.activate", "") }}/' + userId;
         
         const modal = new bootstrap.Modal(document.getElementById('activateModal'));
+        modal.show();
+    }
+
+    // Modal de suppression
+    function openDeleteModal(userId, userName) {
+        document.getElementById('deleteUserName').textContent = userName;
+        document.getElementById('deleteForm').action = '{{ route("admin.users.destroy", "") }}/' + userId;
+        
+        const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
         modal.show();
     }
 

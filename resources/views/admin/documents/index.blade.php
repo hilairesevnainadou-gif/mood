@@ -6,7 +6,7 @@
 
 @push('styles')
 <style>
-    /* Stats */
+    /* Stats optimisés */
     .stats-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -263,6 +263,7 @@
         gap: 1rem;
         font-size: 0.75rem;
         color: var(--admin-text-muted);
+        flex-wrap: wrap;
     }
 
     .doc-status {
@@ -332,12 +333,6 @@
         border-color: #dc2626;
     }
 
-    .btn-icon.view:hover {
-        background: #dbeafe;
-        color: #2563eb;
-        border-color: #2563eb;
-    }
-
     .btn-icon:disabled {
         opacity: 0.4;
         cursor: not-allowed;
@@ -405,7 +400,7 @@
         margin-bottom: 1rem;
     }
 
-    /* Modal */
+    /* Modals */
     .modal-overlay {
         position: fixed;
         inset: 0;
@@ -429,18 +424,6 @@
         max-width: 500px;
         max-height: 90vh;
         overflow: hidden;
-        animation: modalSlide 0.3s ease;
-    }
-
-    @keyframes modalSlide {
-        from {
-            opacity: 0;
-            transform: translateY(-20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
 
     .modal-header {
@@ -469,12 +452,6 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.2s ease;
-    }
-
-    .modal-close:hover {
-        background: var(--admin-bg);
-        color: var(--admin-text);
     }
 
     .modal-body {
@@ -515,7 +492,37 @@
     .form-group textarea:focus {
         outline: none;
         border-color: var(--admin-accent);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    /* Buttons */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+        text-decoration: none;
+    }
+
+    .btn-success {
+        background: var(--admin-success);
+        color: white;
+    }
+
+    .btn-danger {
+        background: var(--admin-danger);
+        color: white;
+    }
+
+    .btn-secondary {
+        background: var(--admin-bg);
+        color: var(--admin-text);
+        border: 1px solid var(--admin-border);
     }
 
     /* Responsive */
@@ -588,7 +595,7 @@
             </a>
             <a href="{{ route('admin.documents.index', ['filter' => 'pending']) }}"
                class="filter-btn {{ request('filter') === 'pending' ? 'active' : '' }}">
-                <i class="fa-solid fa-clock"></i> En attente de validation
+                <i class="fa-solid fa-clock"></i> En attente
             </a>
             <a href="{{ route('admin.documents.index', ['filter' => 'complete']) }}"
                class="filter-btn {{ request('filter') === 'complete' ? 'active' : '' }}">
@@ -640,17 +647,17 @@
 
                     <div class="user-actions">
                         @if($hasPending)
-                            <button type="button" class="btn btn-success" onclick="validateAllForUser({{ $user->id }})">
+                            <button type="button" class="btn btn-success" onclick="openValidateAllModal({{ $user->id }}, {{ $pendingCount }})">
                                 <i class="fa-solid fa-check-double"></i> Tout valider ({{ $pendingCount }})
                             </button>
                         @else
-                            <button type="button" class="btn btn-success" disabled style="opacity: 0.5; cursor: not-allowed;">
+                            <button type="button" class="btn btn-success" disabled style="opacity: 0.5;">
                                 <i class="fa-solid fa-check-double"></i> Tout validé ✓
                             </button>
                         @endif
 
                         <a href="{{ route('admin.documents.show', $user->id) }}" class="btn btn-secondary">
-                            <i class="fa-solid fa-eye"></i> Voir détails
+                            <i class="fa-solid fa-eye"></i> Détails
                         </a>
                     </div>
                 </div>
@@ -662,10 +669,15 @@
                             $canReject = $document->status === 'pending';
                             $isValidated = $document->status === 'validated';
                             $isRejected = $document->status === 'rejected';
+                            
+                            $iconClass = 'default';
+                            if(method_exists($document, 'isPdf') && $document->isPdf()) $iconClass = 'pdf';
+                            elseif(method_exists($document, 'isImage') && $document->isImage()) $iconClass = 'image';
+                            elseif(method_exists($document, 'isWordDocument') && $document->isWordDocument()) $iconClass = 'word';
+                            elseif(method_exists($document, 'isExcelDocument') && $document->isExcelDocument()) $iconClass = 'excel';
                         @endphp
 
                         <div class="document-item" data-doc-id="{{ $document->id }}" data-status="{{ $document->status }}">
-                            {{-- Checkbox : uniquement si en attente ou rejeté (peut être validé) --}}
                             <div class="doc-select">
                                 @if($canValidate)
                                     <div class="custom-checkbox" onclick="toggleSelect(this, {{ $document->id }})" data-selectable="true">
@@ -678,52 +690,48 @@
                                 @endif
                             </div>
 
-                            <div class="doc-icon {{ $document->isPdf() ? 'pdf' : ($document->isImage() ? 'image' : ($document->isWordDocument() ? 'word' : ($document->isExcelDocument() ? 'excel' : 'default'))) }}">
+                            <div class="doc-icon {{ $iconClass }}">
                                 <i class="fa-solid {{ $document->file_icon ?? 'fa-file' }}"></i>
                             </div>
 
                             <div class="doc-info">
                                 <div class="doc-name">{{ $document->name }}</div>
                                 <div class="doc-meta">
-                                    <span><i class="fa-solid fa-tag"></i> {{ $document->type_label }}</span>
-                                    <span><i class="fa-solid fa-weight-hanging"></i> {{ $document->formatted_size }}</span>
+                                    <span><i class="fa-solid fa-tag"></i> {{ $document->type_label ?? 'Document' }}</span>
+                                    <span><i class="fa-solid fa-weight-hanging"></i> {{ $document->formatted_size ?? 'N/A' }}</span>
                                     <span><i class="fa-solid fa-calendar"></i> {{ $document->created_at->format('d/m/Y') }}</span>
                                 </div>
                             </div>
 
                             <div class="doc-status">
                                 <span class="status-badge {{ $document->status }}">
-                                    {{ $document->status_label }}
+                                    {{ $document->status_label ?? ucfirst($document->status) }}
                                 </span>
                             </div>
 
                             <div class="doc-actions">
-                                {{-- Bouton Valider : visible si pending ou rejected --}}
                                 @if($canValidate)
-                                    <form method="POST" action="{{ route('admin.documents.validate', $document->id) }}" style="display: inline;">
-                                        @csrf
-                                        <button type="submit" class="btn-icon validate" title="Valider ce document">
-                                            <i class="fa-solid fa-check"></i>
-                                        </button>
-                                    </form>
+                                    <button type="button" class="btn-icon validate" title="Valider"
+                                            onclick="openValidateModal({{ $document->id }}, '{{ addslashes($document->name) }}')">
+                                        <i class="fa-solid fa-check"></i>
+                                    </button>
                                 @else
-                                    <button type="button" class="btn-icon validated-state" title="Déjà validé" disabled>
+                                    <button type="button" class="btn-icon validated-state" disabled>
                                         <i class="fa-solid fa-check"></i>
                                     </button>
                                 @endif
 
-                                {{-- Bouton Rejeter : visible uniquement si pending --}}
                                 @if($canReject)
-                                    <button type="button" class="btn-icon reject" title="Rejeter ce document"
+                                    <button type="button" class="btn-icon reject" title="Rejeter"
                                             onclick="openRejectModal({{ $document->id }}, '{{ addslashes($document->name) }}')">
                                         <i class="fa-solid fa-times"></i>
                                     </button>
                                 @elseif($isRejected)
-                                    <button type="button" class="btn-icon rejected-state" title="Déjà rejeté" disabled>
+                                    <button type="button" class="btn-icon rejected-state" disabled>
                                         <i class="fa-solid fa-times"></i>
                                     </button>
                                 @else
-                                    <button type="button" class="btn-icon" style="opacity: 0.3; cursor: not-allowed;" title="Validation impossible" disabled>
+                                    <button type="button" class="btn-icon" style="opacity: 0.3;" disabled>
                                         <i class="fa-solid fa-times"></i>
                                     </button>
                                 @endif
@@ -752,27 +760,87 @@
         <div class="bulk-info">
             <span id="selectedCount">0</span> document(s) sélectionné(s)
         </div>
-        <form id="bulkValidateForm" method="POST" action="{{ route('admin.documents.bulk-validate') }}" style="display: inline;">
-            @csrf
-            <input type="hidden" name="document_ids" id="selectedDocuments">
-            <button type="submit" class="btn btn-success">
-                <i class="fa-solid fa-check"></i> Valider la sélection
-            </button>
-        </form>
+        <button type="button" class="btn btn-success" onclick="openBulkValidateModal()">
+            <i class="fa-solid fa-check"></i> Valider
+        </button>
         <button type="button" class="btn btn-secondary" onclick="clearSelection()">
             <i class="fa-solid fa-times"></i> Annuler
         </button>
     </div>
 
-    {{-- Reject Modal --}}
+    {{-- Modal: Validation Individuelle --}}
+    <div class="modal-overlay" id="validateModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-check-circle" style="color: var(--admin-success);"></i> Valider le document</h3>
+                <button type="button" class="modal-close" onclick="closeModal('validateModal')">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="validateForm" method="POST" action="">
+                @csrf
+                <div class="modal-body">
+                    <p>Êtes-vous sûr de vouloir valider <strong id="validateDocName"></strong> ?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('validateModal')">Annuler</button>
+                    <button type="submit" class="btn btn-success">Confirmer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Modal: Validation en Masse --}}
+    <div class="modal-overlay" id="bulkValidateModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-check-double" style="color: var(--admin-accent);"></i> Validation en masse</h3>
+                <button type="button" class="modal-close" onclick="closeModal('bulkValidateModal')">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('admin.documents.bulk-validate') }}">
+                @csrf
+                <input type="hidden" name="document_ids" id="bulkDocumentIds">
+                <div class="modal-body">
+                    <p>Valider <strong id="bulkCountDisplay">0</strong> document(s) sélectionné(s) ?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('bulkValidateModal')">Annuler</button>
+                    <button type="submit" class="btn btn-success">Valider tous</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Modal: Validation Tous Documents --}}
+    <div class="modal-overlay" id="validateAllModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-user-check" style="color: var(--admin-success);"></i> Tout valider</h3>
+                <button type="button" class="modal-close" onclick="closeModal('validateAllModal')">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="validateAllForm" method="POST" action="">
+                @csrf
+                <div class="modal-body">
+                    <p>Valider <strong id="validateAllCount">0</strong> document(s) en attente pour cet utilisateur ?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('validateAllModal')">Annuler</button>
+                    <button type="submit" class="btn btn-success">Tout valider</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Modal: Rejet --}}
     <div class="modal-overlay" id="rejectModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>
-                    <i class="fa-solid fa-times-circle" style="color: var(--admin-danger); margin-right: 0.5rem;"></i>
-                    Rejeter le document
-                </h3>
-                <button type="button" class="modal-close" onclick="closeRejectModal()">
+                <h3><i class="fa-solid fa-times-circle" style="color: var(--admin-danger);"></i> Rejeter le document</h3>
+                <button type="button" class="modal-close" onclick="closeModal('rejectModal')">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -780,18 +848,16 @@
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>Document : <span id="rejectDocName" style="color: var(--admin-text-muted); font-weight: 400;"></span></label>
+                        <label>Document : <span id="rejectDocName" style="font-weight: 600;"></span></label>
                     </div>
                     <div class="form-group">
                         <label for="rejectReason">Motif du rejet <span style="color: var(--admin-danger);">*</span></label>
-                        <textarea name="reason" id="rejectReason" required minlength="10" placeholder="Expliquez pourquoi ce document est rejeté (minimum 10 caractères)..."></textarea>
+                        <textarea name="reason" id="rejectReason" required minlength="10" placeholder="Minimum 10 caractères..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeRejectModal()">Annuler</button>
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fa-solid fa-times"></i> Confirmer le rejet
-                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('rejectModal')">Annuler</button>
+                    <button type="submit" class="btn btn-danger">Rejeter</button>
                 </div>
             </form>
         </div>
@@ -800,17 +866,15 @@
 
 @push('scripts')
 <script>
-    // Variables globales
     let selectedDocs = new Set();
 
-    // Toggle sélection d'un document
     function toggleSelect(checkbox, docId) {
-        // Ne rien faire si ce n'est pas sélectionnable
         if (checkbox.getAttribute('data-selectable') !== 'true') return;
-
+        
         const icon = checkbox.querySelector('i');
-
-        if (checkbox.classList.contains('checked')) {
+        const isChecked = checkbox.classList.contains('checked');
+        
+        if (isChecked) {
             checkbox.classList.remove('checked');
             icon.style.display = 'none';
             selectedDocs.delete(docId);
@@ -819,112 +883,80 @@
             icon.style.display = 'block';
             selectedDocs.add(docId);
         }
-
+        
         updateBulkActions();
     }
 
-    // Mise à jour de la barre d'actions en masse
     function updateBulkActions() {
         const bar = document.getElementById('bulkActionsBar');
         const count = document.getElementById('selectedCount');
-        const input = document.getElementById('selectedDocuments');
-
+        
         count.textContent = selectedDocs.size;
-        input.value = Array.from(selectedDocs).join(',');
-
-        if (selectedDocs.size > 0) {
-            bar.classList.add('active');
-        } else {
-            bar.classList.remove('active');
-        }
+        bar.classList.toggle('active', selectedDocs.size > 0);
     }
 
-    // Vider la sélection
     function clearSelection() {
         selectedDocs.clear();
-        document.querySelectorAll('.custom-checkbox[data-selectable="true"].checked').forEach(function(cb) {
+        document.querySelectorAll('.custom-checkbox[data-selectable="true"]').forEach(cb => {
             cb.classList.remove('checked');
             cb.querySelector('i').style.display = 'none';
         });
         updateBulkActions();
     }
 
-    // Valider tous les documents d'un utilisateur
-    function validateAllForUser(userId) {
-        const pendingCountElement = document.querySelector('[data-user-id="' + userId + '"] .user-stat-value');
-        const pendingCount = pendingCountElement ? pendingCountElement.textContent.trim() : '0';
-
-        if (!confirm('Valider les ' + pendingCount + ' document(s) en attente de cet utilisateur ?')) {
-            return;
-        }
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{{ route("admin.documents.validate-user", ":userId") }}'.replace(':userId', userId);
-
-        const csrf = document.createElement('input');
-        csrf.type = 'hidden';
-        csrf.name = '_token';
-        csrf.value = '{{ csrf_token() }}';
-
-        form.appendChild(csrf);
-        document.body.appendChild(form);
-        form.submit();
+    function openValidateModal(docId, docName) {
+        document.getElementById('validateForm').action = '/admin/documents/' + docId + '/validate';
+        document.getElementById('validateDocName').textContent = docName;
+        openModal('validateModal');
     }
 
-    // Ouvrir le modal de rejet
+    function openBulkValidateModal() {
+        if (selectedDocs.size === 0) return;
+        document.getElementById('bulkDocumentIds').value = Array.from(selectedDocs).join(',');
+        document.getElementById('bulkCountDisplay').textContent = selectedDocs.size;
+        openModal('bulkValidateModal');
+    }
+
+    function openValidateAllModal(userId, count) {
+        document.getElementById('validateAllForm').action = '/admin/documents/user/' + userId + '/validate-all';
+        document.getElementById('validateAllCount').textContent = count;
+        openModal('validateAllModal');
+    }
+
     function openRejectModal(docId, docName) {
-        const modal = document.getElementById('rejectModal');
-        const form = document.getElementById('rejectForm');
-        const nameSpan = document.getElementById('rejectDocName');
+        document.getElementById('rejectForm').action = '/admin/documents/' + docId + '/reject';
+        document.getElementById('rejectDocName').textContent = docName;
+        openModal('rejectModal');
+    }
 
-        form.action = '{{ url("admin/documents") }}/' + docId + '/reject';
-        nameSpan.textContent = docName;
-        modal.classList.add('active');
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
         document.body.style.overflow = 'hidden';
-
-        // Focus sur le textarea après animation
-        setTimeout(function() {
-            document.getElementById('rejectReason').focus();
-        }, 100);
     }
 
-    // Fermer le modal de rejet
-    function closeRejectModal() {
-        const modal = document.getElementById('rejectModal');
-        modal.classList.remove('active');
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
         document.body.style.overflow = '';
-        document.getElementById('rejectReason').value = '';
     }
 
-    // Fermer le modal en cliquant sur l'overlay
-    document.getElementById('rejectModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeRejectModal();
-        }
-    });
-
-    // Fermer avec la touche Escape
+    // Fermer avec Escape
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
-            closeRejectModal();
+            document.querySelectorAll('.modal-overlay.active').forEach(m => {
+                m.classList.remove('active');
+            });
+            document.body.style.overflow = '';
         }
     });
 
-    // Confirmation pour la validation individuelle
-    document.querySelectorAll('form[action*="validate"]').forEach(function(form) {
-        form.addEventListener('submit', function(e) {
-            if (!confirm('Valider ce document ?')) {
-                e.preventDefault();
+    // Fermer en cliquant sur l'overlay
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+                document.body.style.overflow = '';
             }
         });
-    });
-
-    // Confirmation pour la validation en masse
-    document.getElementById('bulkValidateForm').addEventListener('submit', function(e) {
-        if (!confirm('Valider ' + selectedDocs.size + ' document(s) sélectionné(s) ?')) {
-            e.preventDefault();
-        }
     });
 </script>
 @endpush

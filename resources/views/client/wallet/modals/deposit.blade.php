@@ -1,1113 +1,1442 @@
-<div class="slide-modal" id="depositSlide">
-    <div class="slide-content">
-        <div class="slide-header">
-            <h3><i class="fas fa-arrow-down"></i> Faire un dépôt</h3>
-            <button class="slide-close" onclick="closeSlide('depositSlide')">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-
-        <div class="slide-body">
-            <form id="depositForm">
-                @csrf
-
-                <!-- Section montant -->
-                <div class="form-section">
-                    <label class="section-label">
-                        <i class="fas fa-money-bill-wave"></i>
-                        Montant à déposer
-                    </label>
-
-                    <!-- Montants rapides -->
-                    <div class="amount-grid">
-                        <button type="button" class="amount-card" data-amount="1000">
-                            <span class="amount-value">1 000</span>
-                            <span class="amount-currency">FCFA</span>
-                        </button>
-                        <button type="button" class="amount-card" data-amount="5000">
-                            <span class="amount-value">5 000</span>
-                            <span class="amount-currency">FCFA</span>
-                        </button>
-                        <button type="button" class="amount-card" data-amount="10000">
-                            <span class="amount-value">10 000</span>
-                            <span class="amount-currency">FCFA</span>
-                        </button>
-                        <button type="button" class="amount-card" data-amount="20000">
-                            <span class="amount-value">20 000</span>
-                            <span class="amount-currency">FCFA</span>
-                        </button>
-                        <button type="button" class="amount-card" data-amount="50000">
-                            <span class="amount-value">50 000</span>
-                            <span class="amount-currency">FCFA</span>
-                        </button>
-                        <button type="button" class="amount-card" data-amount="100000">
-                            <span class="amount-value">100 000</span>
-                            <span class="amount-currency">FCFA</span>
-                        </button>
-                    </div>
-
-                    <!-- Input montant personnalisé -->
-                    <div class="custom-amount-wrapper">
-                        <div class="input-icon-wrapper">
-                            <i class="fas fa-pen"></i>
-                            <input type="number"
-                                   class="form-input"
-                                   id="depositAmount"
-                                   name="amount"
-                                   placeholder="Montant personnalisé"
-                                   min="100"
-                                   step="100">
-                        </div>
-                        <span class="input-suffix">FCFA</span>
-                    </div>
-
-                    <p class="hint-text">
-                        <i class="fas fa-info-circle"></i>
-                        Minimum : 100 FCFA • Maximum : 10 000 000 FCFA
-                    </p>
-                </div>
-
-                <!-- Section téléphone -->
-                <div class="form-section">
-                    <label class="section-label">
-                        <i class="fas fa-mobile-alt"></i>
-                        Numéro de paiement
-                    </label>
-
-                    <div class="phone-input-wrapper">
-                        <span class="phone-prefix">+229</span>
-                        <input type="tel"
-                               class="form-input phone-input"
-                               id="paymentPhone"
-                               name="phone"
-                               placeholder="01 97 89 90 67"
-                               maxlength="10"
-                               value="{{ preg_replace('/^(?:\+229|00229|229)/', '', Auth::user()->phone ?? '') }}">
-                    </div>
-
-                    <p class="hint-text">
-                        <i class="fas fa-shield-alt"></i>
-                        Ce numéro sera utilisé pour valider le paiement sur votre téléphone
-                    </p>
-                </div>
-
-                <!-- Récapitulatif -->
-                <div class="summary-card" id="summaryCard" style="display: none;">
-                    <div class="summary-row">
-                        <span>Montant</span>
-                        <strong id="summaryAmount">0 FCFA</strong>
-                    </div>
-                    <div class="summary-row">
-                        <span>Frais</span>
-                        <strong class="text-success">0 FCFA</strong>
-                    </div>
-                    <div class="summary-divider"></div>
-                    <div class="summary-row total">
-                        <span>Total à payer</span>
-                        <strong id="summaryTotal">0 FCFA</strong>
-                    </div>
-                </div>
-
-                <!-- Bouton de paiement -->
-                <button type="submit" class="pay-button" id="payButton" disabled>
-                    <span class="pay-icon"><i class="fas fa-lock"></i></span>
-                    <span class="pay-text">Payer maintenant</span>
-                    <span class="pay-amount" id="payButtonAmount">0 F</span>
-                </button>
-
-                <!-- Sécurité -->
-                <div class="security-badge">
-                    <div class="security-icon">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
-                    <div class="security-content">
-                        <strong>Paiement sécurisé par Kkiapay</strong>
-                        <span>PCI DSS compliant • Encryption SSL</span>
-                    </div>
-                </div>
-
-                <!-- Instructions -->
-                <div class="steps-section">
-                    <h4><i class="fas fa-list-ol"></i> Comment ça marche</h4>
-                    <div class="step-item">
-                        <div class="step-number">1</div>
-                        <div class="step-text">
-                            <strong>Saisissez le montant</strong>
-                            <span>Choisissez un montant rapide ou personnalisé</span>
-                        </div>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-number">2</div>
-                        <div class="step-text">
-                            <strong>Validez sur téléphone</strong>
-                            <span>Recevez une notification pour confirmer</span>
-                        </div>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-number">3</div>
-                        <div class="step-text">
-                            <strong>Crédit instantané</strong>
-                            <span>Votre wallet est crédité immédiatement</span>
-                        </div>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Loading Overlay -->
-<div id="deposit-loading" class="loading-overlay">
-    <div class="loading-spinner"></div>
-    <p class="loading-text">Traitement en cours...</p>
-    <p class="loading-subtext">Veuillez valider sur votre téléphone</p>
-</div>
-
-@if(config('services.kkiapay.sandbox', true))
-<!-- Mode Test -->
-{{-- <div class="sandbox-banner">
-    <i class="fas fa-flask"></i>
-    <div class="sandbox-content">
-        <strong>Mode Test (Sandbox)</strong>
-        <p>Utilisez : <strong>97000000</strong> | OTP: <strong>123456</strong> | Code: <strong>1234</strong></p>
-    </div>
-</div> --}}
-@endif
-
-<style>
-/* ===== Modal Slide ===== */
-.slide-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    z-index: 9999;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.slide-modal.show {
-    opacity: 1;
-    visibility: visible;
-}
-
-.slide-modal.show .slide-content {
-    transform: translateY(0);
-}
-
-.slide-content {
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
-    background: #ffffff;
-    border-radius: 24px 24px 0 0;
-    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transform: translateY(100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.slide-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 24px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    flex-shrink: 0;
-}
-
-.slide-header h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.slide-close {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.slide-close:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: rotate(90deg);
-}
-
-.slide-body {
-    padding: 24px;
-    overflow-y: auto;
-    flex: 1;
-}
-
-/* ===== Form Sections ===== */
-.form-section {
-    margin-bottom: 24px;
-}
-
-.section-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.section-label i {
-    color: #667eea;
-}
-
-/* ===== Amount Grid ===== */
-.amount-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.amount-card {
-    background: #f9fafb;
-    border: 2px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 16px 8px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-}
-
-.amount-card:hover {
-    border-color: #667eea;
-    background: #eef2ff;
-    transform: translateY(-2px);
-}
-
-.amount-card.selected {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-color: #667eea;
-    color: white;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    transform: translateY(-2px);
-}
-
-.amount-value {
-    font-size: 1.125rem;
-    font-weight: 700;
-}
-
-.amount-currency {
-    font-size: 0.75rem;
-    font-weight: 500;
-    opacity: 0.8;
-}
-
-/* ===== Custom Amount ===== */
-.custom-amount-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
-.input-icon-wrapper {
-    position: relative;
-    flex: 1;
-}
-
-.input-icon-wrapper i {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #9ca3af;
-    font-size: 1rem;
-}
-
-.form-input {
-    width: 100%;
-    padding: 14px 16px;
-    border: 2px solid #e5e7eb;
-    border-radius: 12px;
-    font-size: 1rem;
-    transition: all 0.2s;
-    background: white;
-    color: #111827;
-}
-
-.form-input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.input-icon-wrapper .form-input {
-    padding-left: 44px;
-}
-
-.input-suffix {
-    position: absolute;
-    right: 16px;
-    color: #6b7280;
-    font-weight: 500;
-    font-size: 0.875rem;
-}
-
-/* ===== Phone Input ===== */
-.phone-input-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    border: 2px solid #e5e7eb;
-    border-radius: 12px;
-    overflow: hidden;
-    transition: all 0.2s;
-}
-
-.phone-input-wrapper:focus-within {
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.phone-prefix {
-    background: #f3f4f6;
-    padding: 14px 16px;
-    font-weight: 600;
-    color: #374151;
-    border-right: 2px solid #e5e7eb;
-    font-size: 1rem;
-}
-
-.phone-input {
-    border: none !important;
-    border-radius: 0 !important;
-    flex: 1;
-}
-
-.phone-input:focus {
-    box-shadow: none !important;
-}
-
-/* ===== Summary Card ===== */
-.summary-card {
-    background: #f9fafb;
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
-    border: 1px solid #e5e7eb;
-}
-
-.summary-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    font-size: 0.9375rem;
-}
-
-.summary-row span {
-    color: #6b7280;
-}
-
-.summary-row strong {
-    color: #111827;
-    font-weight: 600;
-}
-
-.summary-row.total {
-    font-size: 1.125rem;
-    margin-bottom: 0;
-    padding-top: 12px;
-    border-top: 2px solid #e5e7eb;
-}
-
-.summary-row.total strong {
-    color: #667eea;
-    font-size: 1.25rem;
-}
-
-.text-success {
-    color: #10b981 !important;
-}
-
-.summary-divider {
-    height: 1px;
-    background: #e5e7eb;
-    margin: 12px 0;
-}
-
-/* ===== Pay Button ===== */
-.pay-button {
-    width: 100%;
-    padding: 18px 24px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 16px;
-    font-size: 1.125rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
-    margin-bottom: 20px;
-}
-
-.pay-button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
-}
-
-.pay-button:active:not(:disabled) {
-    transform: translateY(0);
-}
-
-.pay-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    background: #9ca3af;
-    box-shadow: none;
-}
-
-.pay-icon {
-    width: 40px;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.pay-text {
-    flex: 1;
-    text-align: center;
-}
-
-.pay-amount {
-    background: rgba(255, 255, 255, 0.2);
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 1rem;
-}
-
-/* ===== Security Badge ===== */
-.security-badge {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px;
-    background: #fef3c7;
-    border-radius: 12px;
-    margin-bottom: 24px;
-    border: 1px solid #fde68a;
-}
-
-.security-icon {
-    width: 48px;
-    height: 48px;
-    background: #f59e0b;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1.5rem;
-    flex-shrink: 0;
-}
-
-.security-content {
-    flex: 1;
-}
-
-.security-content strong {
-    display: block;
-    color: #92400e;
-    font-size: 0.9375rem;
-    margin-bottom: 4px;
-}
-
-.security-content span {
-    color: #b45309;
-    font-size: 0.875rem;
-}
-
-/* ===== Steps Section ===== */
-.steps-section {
-    background: #eff6ff;
-    border-radius: 12px;
-    padding: 20px;
-    border: 1px solid #dbeafe;
-}
-
-.steps-section h4 {
-    margin: 0 0 16px 0;
-    color: #1e40af;
-    font-size: 0.9375rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.step-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.step-item:last-child {
-    margin-bottom: 0;
-}
-
-.step-number {
-    width: 28px;
-    height: 28px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.875rem;
-    flex-shrink: 0;
-}
-
-.step-text {
-    flex: 1;
-}
-
-.step-text strong {
-    display: block;
-    color: #1e40af;
-    font-size: 0.9375rem;
-    margin-bottom: 2px;
-}
-
-.step-text span {
-    color: #3b82f6;
-    font-size: 0.875rem;
-}
-
-/* ===== Hint Text ===== */
-.hint-text {
-    margin: 8px 0 0 0;
-    font-size: 0.8125rem;
-    color: #6b7280;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.hint-text i {
-    color: #9ca3af;
-    font-size: 0.875rem;
-}
-
-/* ===== Loading Overlay ===== */
-.loading-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.9);
-    backdrop-filter: blur(8px);
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    z-index: 10000;
-}
-
-.loading-overlay.active {
-    display: flex;
-}
-
-.loading-spinner {
-    width: 60px;
-    height: 60px;
-    border: 4px solid rgba(255, 255, 255, 0.2);
-    border-top-color: #667eea;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 24px;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.loading-text {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: 8px;
-}
-
-.loading-subtext {
-    font-size: 0.9375rem;
-    opacity: 0.7;
-}
-
-/* ===== Sandbox Banner ===== */
-.sandbox-banner {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #fef3c7;
-    border: 2px solid #f59e0b;
-    border-radius: 12px;
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    z-index: 10001;
-    max-width: 90%;
-}
-
-.sandbox-banner i {
-    font-size: 1.5rem;
-    color: #d97706;
-}
-
-.sandbox-content strong {
-    display: block;
-    color: #92400e;
-    margin-bottom: 4px;
-}
-
-.sandbox-content p {
-    margin: 0;
-    color: #b45309;
-    font-size: 0.875rem;
-}
-
-/* ===== Responsive ===== */
-@media (max-width: 480px) {
-    .slide-content {
-        max-width: 100%;
-        border-radius: 20px 20px 0 0;
-    }
-
-    .amount-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .slide-body {
-        padding: 20px;
-    }
-}
-</style>
-
-@push('scripts')
-<script src="https://cdn.kkiapay.me/k.js"></script>
-<script>
-// Configuration
-const KKIAPAY_CONFIG = {
-    key: '{{ config("services.kkiapay.public_key") }}',
-    sandbox: {{ config("services.kkiapay.sandbox", true) ? 'true' : 'false' }},
-    url: '{{ asset("images/logo.png") }}'
-};
-
-const USER_DATA = {
-    name: '{{ Auth::user()->name }}',
-    email: '{{ Auth::user()->email }}',
-    walletId: {{ $wallet->id }}
-};
-
-// Numéro brut de la base: 2290197899067 → on enlève le préfixe 229
-const RAW_PHONE = '{{ Auth::user()->phone ?? "" }}';
-
-let currentAmount = 0;
-let kkiapayListenersConfigured = false;
-
-// Initialisation
-document.addEventListener('DOMContentLoaded', function() {
-    initDepositModal();
-
-    // Nettoyer le numéro au chargement
-    const phoneInput = document.getElementById('paymentPhone');
-    if (phoneInput) {
-        phoneInput.value = cleanPhoneNumber(RAW_PHONE);
-    }
-});
-
-/**
- * Nettoie le numéro de téléphone en retirant les indicatifs
- */
-function cleanPhoneNumber(phone) {
-    if (!phone) return '';
-
-    phone = phone.toString().replace(/[\s\-]/g, '');
-
-    if (phone.startsWith('+229')) {
-        phone = phone.substring(4);
-    } else if (phone.startsWith('00229')) {
-        phone = phone.substring(5);
-    } else if (phone.startsWith('229') && phone.length > 10) {
-        phone = phone.substring(3);
-    }
-
-    return phone;
-}
-
-function initDepositModal() {
-    const amountCards = document.querySelectorAll('.amount-card');
-    const depositAmountInput = document.getElementById('depositAmount');
-    const depositForm = document.getElementById('depositForm');
-    const phoneInput = document.getElementById('paymentPhone');
-
-    // Gestion des montants rapides
-    amountCards.forEach(card => {
-        card.addEventListener('click', function() {
-            const amount = parseInt(this.getAttribute('data-amount'));
-            selectAmount(amount, this);
-        });
-    });
-
-    // Gestion du montant personnalisé
-    if (depositAmountInput) {
-        depositAmountInput.addEventListener('input', function() {
-            const amount = parseInt(this.value) || 0;
-            selectAmount(amount, null);
-        });
-
-        depositAmountInput.addEventListener('blur', function() {
-            const amount = parseInt(this.value) || 0;
-            if (amount > 0 && amount < 100) {
-                showToast('warning', 'Montant minimum', 'Le montant minimum est de 100 FCFA');
-                this.value = 100;
-                selectAmount(100, null);
-            }
-        });
-    }
-
-    // Formatage du numéro de téléphone à la saisie
-    if (phoneInput) {
-        phoneInput.addEventListener('input', function(e) {
-            let value = this.value.replace(/\D/g, '');
-            if (value.length > 10) {
-                value = value.substring(0, 10);
-            }
-            this.value = value;
-            updatePayButton();
-        });
-    }
-
-    // Soumission du formulaire
-    if (depositForm) {
-        depositForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            if (!validateForm()) {
-                return;
-            }
-
-            openKkiapayPayment();
-        });
-    }
-}
-
-function selectAmount(amount, selectedCard) {
-    currentAmount = amount;
-
-    document.querySelectorAll('.amount-card').forEach(card => {
-        card.classList.remove('selected');
-    });
-
-    if (selectedCard) {
-        selectedCard.classList.add('selected');
-        const input = document.getElementById('depositAmount');
-        if (input && input.value != amount) {
-            input.value = amount;
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Models\Wallet;
+use App\Models\Transaction;
+use Illuminate\Support\Str;
+use App\Models\Notification;
+use Illuminate\Http\Request;
+use App\Models\FundingRequest;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+
+class WalletController extends Controller
+{
+    /**
+     * Affiche la page du portefeuille
+     */
+    public function wallet()
+    {
+        $user = Auth::user();
+        $wallet = Wallet::where('user_id', $user->id)->first();
+
+        // Créer le wallet s'il n'existe pas
+        if (!$wallet) {
+            $walletNumber = $this->generateWalletNumber();
+            $defaultPin = '000000';
+            $wallet = Wallet::create([
+                'user_id' => $user->id,
+                'wallet_number' => $walletNumber,
+                'balance' => 0,
+                'currency' => 'XOF',
+                'pin_hash' => Hash::make($defaultPin),
+                'security_level' => 'normal',
+            ]);
         }
-    } else {
-        const matchingCard = document.querySelector(`.amount-card[data-amount="${amount}"]`);
-        if (matchingCard) {
-            matchingCard.classList.add('selected');
+
+        // Récupérer les transactions récentes
+        $transactions = $wallet->transactions()->latest()->paginate(10);
+
+        // Récupérer les financements en attente de crédit
+        $pendingFundings = FundingRequest::where('user_id', $user->id)
+            ->whereIn('status', ['completed', 'transfer_pending', 'documents_validated'])
+            ->whereNull('credited_at')
+            ->with(['fundingType', 'documents'])
+            ->latest()
+            ->get();
+
+        // Statistiques mensuelles
+        $monthlyStats = [
+            'deposits' => $wallet->transactions()
+                ->where('type', 'credit')
+                ->where('status', 'completed')
+                ->whereMonth('created_at', now()->month)
+                ->sum('amount'),
+
+            'withdrawals' => $wallet->transactions()
+                ->where('type', 'debit')
+                ->where('status', 'completed')
+                ->whereMonth('created_at', now()->month)
+                ->sum('amount'),
+
+            'payments' => $wallet->transactions()
+                ->where('type', 'payment')
+                ->where('status', 'completed')
+                ->whereMonth('created_at', now()->month)
+                ->sum('amount'),
+
+            'transfers' => $wallet->transactions()
+                ->where('type', 'transfer')
+                ->where('status', 'completed')
+                ->whereMonth('created_at', now()->month)
+                ->sum('amount'),
+        ];
+
+        $monthlyStats['total_in'] = $monthlyStats['deposits'];
+        $monthlyStats['total_out'] = $monthlyStats['withdrawals'] + $monthlyStats['payments'] + $monthlyStats['transfers'];
+        $monthlyStats['balance_change'] = $monthlyStats['total_in'] - $monthlyStats['total_out'];
+
+        return view('client.wallet.index', compact(
+            'wallet',
+            'transactions',
+            'pendingFundings',
+            'monthlyStats'
+        ));
+    }
+
+    /**
+     * Liste des transactions
+     */
+    public function transactions(Request $request)
+    {
+        $user = Auth::user();
+        $wallet = Wallet::where('user_id', $user->id)->firstOrFail();
+
+        $query = $wallet->transactions()->latest();
+
+        // Filtres
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
         }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $transactions = $query->paginate(20)->withQueryString();
+
+        $stats = [
+            'total_in' => (clone $query)->whereIn('type', ['credit', 'refund'])->sum('amount'),
+            'total_out' => (clone $query)->whereIn('type', ['debit', 'payment', 'fee'])->sum('amount'),
+            'count' => (clone $query)->count(),
+        ];
+
+        return view('client.wallet.transactions', compact('transactions', 'stats'));
     }
 
-    updateSummary();
-    updatePayButton();
-}
+     /**
+     * Dépôt via Kkiapay - Initialisation
+     */
+    public function deposit(Request $request)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:100',
+            'phone' => 'required|string|min:8',
+        ]);
 
-function updateSummary() {
-    const summaryCard = document.getElementById('summaryCard');
-    const summaryAmount = document.getElementById('summaryAmount');
-    const summaryTotal = document.getElementById('summaryTotal');
-    const payButtonAmount = document.getElementById('payButtonAmount');
+        $user = Auth::user();
+        $wallet = Wallet::where('user_id', $user->id)->first();
 
-    if (currentAmount >= 100) {
-        summaryCard.style.display = 'block';
-        const formatted = new Intl.NumberFormat('fr-FR').format(currentAmount) + ' FCFA';
-        summaryAmount.textContent = formatted;
-        summaryTotal.textContent = formatted;
-        payButtonAmount.textContent = new Intl.NumberFormat('fr-FR').format(currentAmount) + ' F';
-    } else {
-        summaryCard.style.display = 'none';
-        payButtonAmount.textContent = '0 F';
-    }
-}
+        if (!$wallet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Portefeuille non trouvé.'
+            ], 404);
+        }
 
-function updatePayButton() {
-    const phoneInput = document.getElementById('paymentPhone');
-    const payButton = document.getElementById('payButton');
-    const phone = phoneInput ? phoneInput.value.replace(/\s/g, '') : '';
-
-    const isValid = currentAmount >= 100 && phone.length >= 8;
-    payButton.disabled = !isValid;
-}
-
-function validateForm() {
-    const phoneInput = document.getElementById('paymentPhone');
-    const phone = phoneInput ? phoneInput.value.replace(/\s/g, '') : '';
-
-    if (currentAmount < 100) {
-        showToast('error', 'Montant invalide', 'Le montant minimum est de 100 FCFA');
-        document.getElementById('depositAmount').focus();
-        return false;
-    }
-
-    if (phone.length < 8) {
-        showToast('error', 'Numéro invalide', 'Veuillez saisir un numéro de téléphone valide');
-        phoneInput.focus();
-        return false;
-    }
-
-    return true;
-}
-
-function openKkiapayPayment() {
-    if (typeof openKkiapayWidget !== 'function') {
-        showToast('error', 'Erreur', 'Le service de paiement n\'est pas chargé. Veuillez rafraîchir la page.');
-        return;
-    }
-
-    const phoneInput = document.getElementById('paymentPhone');
-    let phoneNumber = phoneInput.value.replace(/\s/g, '');
-    phoneNumber = cleanPhoneNumber(phoneNumber);
-
-    console.log('Numéro original:', phoneInput.value);
-    console.log('Numéro nettoyé:', phoneNumber);
-
-    const config = {
-        amount: parseInt(currentAmount),
-        key: KKIAPAY_CONFIG.key,
-        url: KKIAPAY_CONFIG.url,
-        position: 'center',
-        sandbox: KKIAPAY_CONFIG.sandbox,
-        phone: phoneNumber,
-        name: USER_DATA.name,
-        email: USER_DATA.email,
-        callback: '{{ url("/kkiapay/callback") }}',
-        data: JSON.stringify({
-            wallet_id: USER_DATA.walletId,
-            amount: currentAmount,
-            type: 'deposit',
-            phone: phoneNumber,
-            timestamp: Date.now()
-        })
-    };
-
-    console.log('Configuration Kkiapay:', config);
-
-    if (!kkiapayListenersConfigured) {
-        setupKkiapayListeners();
-        kkiapayListenersConfigured = true;
-    }
-
-    try {
-        openKkiapayWidget(config);
-    } catch (error) {
-        console.error('Erreur ouverture Kkiapay:', error);
-        showToast('error', 'Erreur', 'Impossible d\'ouvrir le paiement');
-    }
-}
-
-function setupKkiapayListeners() {
-    if (typeof addSuccessListener === 'function') {
-        addSuccessListener(function(response) {
-            console.log('Paiement réussi:', response);
-            handlePaymentSuccess(response);
-        });
-    }
-
-    if (typeof addFailedListener === 'function') {
-        addFailedListener(function(response) {
-            console.log('Paiement échoué:', response);
-            showToast('error', 'Paiement échoué', response.message || 'Le paiement a été refusé');
-            hideLoading();
-        });
-    }
-
-    if (typeof addPendingListener === 'function') {
-        addPendingListener(function(response) {
-            console.log('Paiement en attente:', response);
-            showLoading('Validation en attente...', 'Veuillez confirmer sur votre téléphone');
-        });
-    }
-
-    if (typeof addKkiapayCloseListener === 'function') {
-        addKkiapayCloseListener(function() {
-            console.log('Widget fermé');
-            hideLoading();
-        });
-    }
-}
-
-async function handlePaymentSuccess(kkiapayResponse) {
-    showLoading('Traitement en cours...', 'Ne fermez pas cette page');
-
-    try {
-        let additionalData = {};
         try {
-            additionalData = JSON.parse(kkiapayResponse.data || '{}');
-        } catch(e) {
-            console.warn('Parse data error:', e);
+            // Générer un ID de transaction unique et mémorable
+            $transactionId = 'KKP-' . strtoupper(Str::random(12));
+            $reference = 'DEP-' . date('Ymd') . '-' . strtoupper(Str::random(6));
+
+            // Créer la transaction en attente
+            $transaction = Transaction::create([
+                'wallet_id' => $wallet->id,
+                'transaction_id' => $transactionId,
+                'reference' => $reference,
+                'type' => 'credit',
+                'amount' => $validated['amount'],
+                'total_amount' => $validated['amount'],
+                'fee' => 0,
+                'status' => 'pending',
+                'payment_method' => 'kkiapay',
+                'description' => 'Dépôt via Kkiapay',
+                'metadata' => [
+                    'phone' => $validated['phone'],
+                    'user_name' => $user->name,
+                    'user_email' => $user->email,
+                    'user_phone' => $user->phone,
+                    'initiated_at' => now()->toIso8601String(),
+                    'ip_address' => $request->ip(),
+                ],
+            ]);
+
+            Log::info('Transaction dépôt créée', [
+                'transaction_id' => $transactionId,
+                'reference' => $reference,
+                'wallet_id' => $wallet->id,
+                'amount' => $validated['amount']
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaction initiée',
+                'transaction_id' => $transactionId,
+                'reference' => $reference,
+                'amount' => $validated['amount'],
+                // Données utilisateur pour Kkiapay
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+                'user_firstname' => $user->first_name ?? $user->name,
+                'user_lastname' => $user->last_name ?? '',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur création transaction dépôt: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur: ' . $e->getMessage()
+            ], 500);
         }
+    }
 
-        const returnedPhone = cleanPhoneNumber(kkiapayResponse.phone || additionalData.phone || '');
-        const walletId = parseInt(additionalData.wallet_id) || USER_DATA.walletId;
 
-        const payload = {
-            transaction_id: kkiapayResponse.transactionId,
-            status: 'success',
-            amount: parseInt(currentAmount),
-            phone: returnedPhone,
-            wallet_id: walletId,
-            kkiapay_data: kkiapayResponse
-        };
-
-        console.log('Envoi au serveur:', payload);
-
-        // URL CORRIGÉE - Route publique sans /client/
-        const response = await fetch('/wallet/deposit/callback', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        console.log('Response status:', response.status);
-
-        const responseText = await response.text();
-        console.log('Response text:', responseText);
-
-        let result;
+  /**
+     * CALLBACK KKIAPAY - Corrigé pour trouver la transaction
+     */
+    public function kkiapayCallback(Request $request)
+    {
         try {
-            result = JSON.parse(responseText);
-        } catch {
-            throw new Error('Réponse serveur invalide: ' + responseText.substring(0, 200));
+            Log::info('=== KKIAPAY CALLBACK ===', [
+                'method' => $request->method(),
+                'all_data' => $request->all(),
+                'headers' => $request->headers->all(),
+                'ip' => $request->ip()
+            ]);
+
+            // Récupérer toutes les données possibles
+            $data = $request->all();
+
+            // CORRECTION 1: Extraire les données du champ 'data' si présent (Kkiapay envoie les données ici)
+            $additionalData = [];
+            if (!empty($data['data'])) {
+                $additionalData = is_string($data['data']) 
+                    ? json_decode($data['data'], true) 
+                    : $data['data'];
+                
+                Log::info('Données extraites du champ data:', $additionalData);
+            }
+
+            // CORRECTION 2: Fusionner les données pour faciliter l'accès
+            // Les données dans 'data' ont priorité sur les données racine
+            $mergedData = array_merge($data, $additionalData);
+
+            // Extraire les identifiants de différentes sources possibles
+            $transactionId = $mergedData['transaction_id'] 
+                ?? $mergedData['transactionId'] 
+                ?? $data['transactionId'] 
+                ?? $data['transaction_id'] 
+                ?? $data['transactionID']
+                ?? null;
+
+            $reference = $mergedData['reference'] 
+                ?? $data['reference'] 
+                ?? $data['ref'] 
+                ?? null;
+
+            $status = strtolower($data['status'] ?? $mergedData['status'] ?? 'unknown');
+            $amount = $data['amount'] ?? $mergedData['amount'] ?? 0;
+            
+            // Téléphone du paiement
+            $phone = $data['phone'] 
+                ?? $data['phoneNumber'] 
+                ?? $data['phone_number']
+                ?? $mergedData['phone']
+                ?? null;
+
+            // CORRECTION 3: Récupérer wallet_id depuis les données fusionnées
+            $walletId = $mergedData['wallet_id'] ?? null;
+
+            Log::info('Données extraites callback', [
+                'transaction_id' => $transactionId,
+                'reference' => $reference,
+                'status' => $status,
+                'amount' => $amount,
+                'phone' => $phone,
+                'wallet_id' => $walletId,
+                'additional_data' => $additionalData,
+                'merged_data' => $mergedData
+            ]);
+
+            // RECHERCHE DE LA TRANSACTION - Plusieurs stratégies
+
+            $transaction = null;
+
+            // 1. Recherche par transaction_id exact (notre ID interne)
+            if ($transactionId) {
+                $transaction = Transaction::where('transaction_id', $transactionId)
+                    ->orWhere('reference', $transactionId)
+                    ->first();
+                
+                if ($transaction) {
+                    Log::info('Transaction trouvée par transaction_id', ['id' => $transaction->id]);
+                }
+            }
+
+            // 2. Recherche par référence
+            if (!$transaction && $reference) {
+                $transaction = Transaction::where('reference', $reference)
+                    ->orWhere('transaction_id', $reference)
+                    ->first();
+                
+                if ($transaction) {
+                    Log::info('Transaction trouvée par reference', ['id' => $transaction->id]);
+                }
+            }
+
+            // 3. Recherche par wallet_id et statut pending (stratégie de secours)
+            if (!$transaction && $walletId) {
+                $transaction = Transaction::where('wallet_id', $walletId)
+                    ->where('status', 'pending')
+                    ->where('type', 'credit')
+                    ->where('payment_method', 'kkiapay')
+                    ->where('created_at', '>', now()->subMinutes(30))
+                    ->latest()
+                    ->first();
+                
+                if ($transaction) {
+                    Log::info('Transaction trouvée par wallet_id + pending', ['id' => $transaction->id]);
+                }
+            }
+
+            // 4. Recherche par montant et téléphone récent
+            if (!$transaction && $amount > 0 && $phone) {
+                $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+                $transaction = Transaction::where('status', 'pending')
+                    ->where('type', 'credit')
+                    ->where('amount', $amount)
+                    ->where('payment_method', 'kkiapay')
+                    ->where('created_at', '>', now()->subMinutes(30))
+                    ->where(function($q) use ($cleanPhone) {
+                        $q->whereJsonContains('metadata->phone', $cleanPhone)
+                          ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.phone')) LIKE ?", ["%$cleanPhone%"]);
+                    })
+                    ->latest()
+                    ->first();
+                
+                if ($transaction) {
+                    Log::info('Transaction trouvée par montant + téléphone', ['id' => $transaction->id]);
+                }
+            }
+
+            // Si toujours pas trouvée mais paiement réussi → créer la transaction
+            if (!$transaction && ($status === 'success' || $status === 'completed')) {
+                Log::info('Transaction non trouvée, création depuis callback');
+                return $this->createTransactionFromCallback($mergedData, $additionalData);
+            }
+
+            if (!$transaction) {
+                Log::error('Transaction non trouvée', [
+                    'transaction_id' => $transactionId,
+                    'reference' => $reference,
+                    'wallet_id' => $walletId,
+                    'data' => $data
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Transaction non trouvée'
+                ], 404);
+            }
+
+            Log::info('Transaction trouvée', [
+                'id' => $transaction->id,
+                'transaction_id' => $transaction->transaction_id,
+                'current_status' => $transaction->status
+            ]);
+
+            // Vérifier si déjà traitée
+            if ($transaction->status === 'completed') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Transaction déjà complétée',
+                    'transaction' => $transaction->toArray()
+                ]);
+            }
+
+            // Traitement selon le statut
+            DB::beginTransaction();
+
+            try {
+                if ($status === 'success' || $status === 'completed') {
+                    // Mettre à jour la transaction
+                    $transaction->update([
+                        'status' => 'completed',
+                        'completed_at' => now(),
+                        'metadata' => array_merge($transaction->metadata ?? [], [
+                            'kkiapay_callback' => $data,
+                            'kkiapay_phone' => $phone,
+                            'processed_at' => now()->toIso8601String(),
+                        ])
+                    ]);
+
+                    // Créditer le wallet
+                    $wallet = $transaction->wallet;
+                    if ($wallet && in_array($transaction->type, ['credit', 'deposit'])) {
+                        $oldBalance = (float) $wallet->balance;
+                        $newBalance = $oldBalance + (float) $transaction->amount;
+                        
+                        $wallet->update([
+                            'balance' => $newBalance,
+                            'last_transaction_at' => now()
+                        ]);
+
+                        Log::info('Wallet crédité', [
+                            'wallet_id' => $wallet->id,
+                            'old_balance' => $oldBalance,
+                            'new_balance' => $newBalance,
+                            'amount_added' => $transaction->amount
+                        ]);
+                    }
+
+                    // Notification utilisateur
+                    $this->notifyUser($wallet->user_id ?? $transaction->wallet->user_id, [
+                        'type' => 'transaction',
+                        'title' => 'Dépôt réussi',
+                        'message' => 'Votre compte a été crédité de ' . number_format($transaction->amount, 0, ',', ' ') . ' FCFA',
+                        'data' => ['transaction_id' => $transaction->id]
+                    ]);
+
+                    DB::commit();
+
+                    Log::info('Transaction complétée avec succès', ['id' => $transaction->id]);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Paiement traité avec succès',
+                        'transaction' => [
+                            'id' => $transaction->id,
+                            'transaction_id' => $transaction->transaction_id,
+                            'status' => 'completed',
+                            'amount' => $transaction->amount,
+                            'new_balance' => $newBalance ?? $wallet->balance ?? null
+                        ]
+                    ]);
+
+                } else {
+                    // Échec
+                    $transaction->update([
+                        'status' => 'failed',
+                        'completed_at' => now(),
+                        'metadata' => array_merge($transaction->metadata ?? [], [
+                            'failure_reason' => 'Statut Kkiapay: ' . $status,
+                            'kkiapay_callback' => $data
+                        ])
+                    ]);
+
+                    DB::commit();
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Paiement échoué',
+                        'status' => $status
+                    ]);
+                }
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Erreur callback Kkiapay: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Crée une transaction depuis le callback si non trouvée
+     */
+    private function createTransactionFromCallback(array $data, array $additionalData): \Illuminate\Http\JsonResponse
+    {
+        try {
+            // CORRECTION: Récupérer wallet_id depuis les bonnes sources
+            $walletId = $additionalData['wallet_id'] 
+                ?? $data['wallet_id'] 
+                ?? null;
+                
+            $amount = $data['amount'] 
+                ?? $additionalData['amount'] 
+                ?? 0;
+                
+            $phone = $data['phone'] 
+                ?? $additionalData['phone'] 
+                ?? null;
+
+            if (!$walletId || !$amount) {
+                Log::error('Données insuffisantes pour créer la transaction', [
+                    'wallet_id' => $walletId,
+                    'amount' => $amount,
+                    'data' => $data
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Données insuffisantes pour créer la transaction'
+                ], 400);
+            }
+
+            $wallet = Wallet::find($walletId);
+            if (!$wallet) {
+                Log::error('Wallet non trouvé', ['wallet_id' => $walletId]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Wallet non trouvé'
+                ], 404);
+            }
+
+            DB::beginTransaction();
+
+            // Générer un nouveau transaction_id si non fourni
+            $newTransactionId = $data['transactionId'] 
+                ?? $additionalData['transaction_id']
+                ?? 'KKP-' . strtoupper(Str::random(12));
+                
+            $newReference = $additionalData['reference'] 
+                ?? 'DEP-' . date('Ymd') . '-' . strtoupper(Str::random(6));
+
+            $transaction = Transaction::create([
+                'wallet_id' => $wallet->id,
+                'transaction_id' => $newTransactionId,
+                'reference' => $newReference,
+                'type' => 'credit',
+                'amount' => $amount,
+                'total_amount' => $amount,
+                'fee' => 0,
+                'status' => 'completed',
+                'payment_method' => 'kkiapay',
+                'description' => 'Dépôt via Kkiapay (auto-créé)',
+                'completed_at' => now(),
+                'metadata' => [
+                    'created_from_callback' => true,
+                    'kkiapay_data' => $data,
+                    'phone' => $phone,
+                    'wallet_id' => $walletId,
+                    'user_name' => $additionalData['user_name'] ?? null,
+                    'user_email' => $additionalData['user_email'] ?? null,
+                ]
+            ]);
+
+            // Créditer le wallet
+            $wallet->increment('balance', $amount);
+            $wallet->update(['last_transaction_at' => now()]);
+
+            $this->notifyUser($wallet->user_id, [
+                'type' => 'transaction',
+                'title' => 'Dépôt réussi',
+                'message' => 'Votre compte a été crédité de ' . number_format($amount, 0, ',', ' ') . ' FCFA',
+            ]);
+
+            DB::commit();
+
+            Log::info('Transaction créée depuis callback', ['id' => $transaction->id]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaction créée et complétée',
+                'transaction' => $transaction->toArray()
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Erreur création transaction callback: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+       /**
+     * Créer une notification
+     */
+    private function notifyUser($userId, array $data)
+    {
+        try {
+            Notification::create([
+                'user_id' => $userId,
+                'type' => $data['type'],
+                'title' => $data['title'],
+                'message' => $data['message'],
+                'data' => $data['data'] ?? [],
+                'is_read' => false,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur création notification: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Demande de retrait
+     */
+    public function withdraw(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'amount' => 'required|numeric|min:1000',
+                'withdraw_method' => 'required|in:mobile_money,bank_transfer',
+                'phone_number' => 'nullable|string|max:20',
+                'account_name' => 'nullable|string|max:255',
+                'account_number' => 'nullable|string|max:50',
+                'bank_name' => 'nullable|string|max:255',
+                'pin' => 'required|string|size:6',
+                'note' => 'nullable|string|max:500',
+            ]);
+
+            // Validation conditionnelle
+            if ($validated['withdraw_method'] === 'mobile_money' && empty($validated['phone_number'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le numéro de téléphone est requis pour Mobile Money'
+                ], 422);
+            }
+
+            if ($validated['withdraw_method'] === 'bank_transfer') {
+                $missingFields = [];
+                if (empty($validated['account_name'])) $missingFields[] = 'nom du bénéficiaire';
+                if (empty($validated['account_number'])) $missingFields[] = 'numéro de compte';
+                if (empty($validated['bank_name'])) $missingFields[] = 'nom de la banque';
+
+                if (!empty($missingFields)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Champs requis manquants : ' . implode(', ', $missingFields)
+                    ], 422);
+                }
+            }
+
+            $user = Auth::user();
+
+            $wallet = Wallet::where('user_id', $user->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Portefeuille non trouvé'
+                ], 404);
+            }
+
+            if (!$wallet->pin_hash || !Hash::check($validated['pin'], $wallet->pin_hash)) {
+                Log::warning('Tentative retrait PIN invalide', [
+                    'user_id' => $user->id,
+                    'wallet_id' => $wallet->id
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PIN incorrect'
+                ], 403);
+            }
+
+            $currentBalance = (float) $wallet->balance;
+            $requestedAmount = (float) $validated['amount'];
+
+            if ($currentBalance < $requestedAmount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Solde insuffisant. Disponible : ' . number_format($currentBalance, 0, ',', ' ') . ' FCFA'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            $wallet->balance = $currentBalance - $requestedAmount;
+            $wallet->last_transaction_at = now();
+            $wallet->save();
+
+            $metadata = [
+                'requested_at' => now()->toIso8601String(),
+                'requested_by' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+                'note' => $validated['note'] ?? null,
+            ];
+
+            if ($validated['withdraw_method'] === 'mobile_money') {
+                $metadata['phone_number'] = $validated['phone_number'];
+            } else {
+                $metadata['account_name'] = $validated['account_name'];
+                $metadata['account_number'] = $validated['account_number'];
+                $metadata['bank_name'] = $validated['bank_name'];
+            }
+
+            $transaction = Transaction::create([
+                'wallet_id' => $wallet->id,
+                'transaction_id' => (string) Str::uuid(),
+                'type' => 'debit',
+                'amount' => $requestedAmount,
+                'total_amount' => $requestedAmount,
+                'fee' => 0,
+                'status' => 'pending',
+                'payment_method' => $validated['withdraw_method'],
+                'description' => 'Demande de retrait - En attente de validation',
+                'reference' => 'WIT-' . strtoupper(Str::random(10)),
+                'metadata' => $metadata,
+            ]);
+
+            $this->createNotification($user->id, [
+                'type' => 'transaction',
+                'title' => 'Demande de retrait soumise',
+                'message' => 'Votre demande de ' . number_format($requestedAmount, 0, ',', ' ') . ' FCFA est en attente de validation.',
+                'data' => [
+                    'transaction_id' => $transaction->id,
+                    'reference' => $transaction->reference,
+                    'status' => 'pending'
+                ]
+            ]);
+
+            $this->notifyAdmins($transaction, $user);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Demande soumise avec succès',
+                'transaction_id' => $transaction->id,
+                'reference' => $transaction->reference,
+                'new_balance' => $wallet->balance,
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first()
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Erreur retrait: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors du traitement.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Notifier les admins
+     */
+    private function notifyAdmins(Transaction $transaction, $user)
+    {
+        try {
+            $admins = \App\Models\User::where('role', 'admin')->get();
+
+            foreach ($admins as $admin) {
+                $this->createNotification($admin->id, [
+                    'type' => 'admin_alert',
+                    'title' => 'Nouvelle demande de retrait',
+                    'message' => $user->name . ' demande un retrait de ' . number_format($transaction->amount, 0, ',', ' ') . ' FCFA',
+                    'data' => [
+                        'transaction_id' => $transaction->id,
+                        'user_id' => $user->id
+                    ]
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Erreur notification admin: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Annuler un retrait
+     */
+    public function cancelWithdrawal(Request $request, $transactionId)
+    {
+        try {
+            $user = Auth::user();
+            $wallet = Wallet::where('user_id', $user->id)->first();
+
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Portefeuille non trouvé'
+                ], 404);
+            }
+
+            DB::beginTransaction();
+
+            $transaction = Transaction::where('id', $transactionId)
+                ->where('wallet_id', $wallet->id)
+                ->where('status', 'pending')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$transaction) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Transaction non trouvée ou déjà traitée'
+                ], 404);
+            }
+
+            $wallet->balance += $transaction->amount;
+            $wallet->save();
+
+            $transaction->status = 'cancelled';
+            $transaction->description = 'Demande annulée par l\'utilisateur';
+            $transaction->save();
+
+            $this->createNotification($user->id, [
+                'type' => 'transaction',
+                'title' => 'Retrait annulé',
+                'message' => 'Votre demande de retrait a été annulée. Le montant a été recrédité.',
+                'data' => [
+                    'transaction_id' => $transaction->id,
+                    'refund_amount' => $transaction->amount
+                ]
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Demande annulée avec succès',
+                'refund_amount' => $transaction->amount,
+                'new_balance' => $wallet->balance
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Erreur annulation retrait: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de l\'annulation'
+            ], 500);
+        }
+    }
+
+    /**
+     * Transfert vers un autre wallet
+     */
+    public function transfer(Request $request)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:100',
+            'recipient_wallet' => 'required|string|max:50',
+            'recipient_name' => 'nullable|string|max:255',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $user = Auth::user();
+        $wallet = Wallet::where('user_id', $user->id)->first();
+
+        if (!$wallet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Portefeuille non trouvé.'
+            ], 404);
         }
 
-        if (!response.ok) {
-            throw new Error(result.message || `Erreur HTTP ${response.status}`);
+        if ($wallet->balance < $validated['amount']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Solde insuffisant !'
+            ], 400);
         }
 
-        if (result.success) {
-            showToast('success', 'Dépôt réussi !',
-                'Votre compte a été crédité de ' + new Intl.NumberFormat('fr-FR').format(currentAmount) + ' FCFA');
+        $recipientWallet = Wallet::where('wallet_number', $validated['recipient_wallet'])->first();
 
-            closeSlide('depositSlide');
-            setTimeout(() => window.location.reload(), 2000);
+        if (!$recipientWallet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Portefeuille destinataire non trouvé.'
+            ], 404);
+        }
+
+        if ($recipientWallet->id === $wallet->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous ne pouvez pas transférer vers votre propre portefeuille.'
+            ], 400);
+        }
+
+        try {
+            DB::transaction(function () use ($wallet, $recipientWallet, $validated, $user) {
+                $wallet->decrement('balance', $validated['amount']);
+                $recipientWallet->increment('balance', $validated['amount']);
+
+                $senderTransaction = Transaction::create([
+                    'wallet_id' => $wallet->id,
+                    'transaction_id' => (string) Str::uuid(),
+                    'type' => 'debit',
+                    'amount' => $validated['amount'],
+                    'total_amount' => $validated['amount'],
+                    'status' => 'completed',
+                    'payment_method' => 'transfer',
+                    'description' => 'Transfert vers ' . ($validated['recipient_name'] ?? $recipientWallet->wallet_number),
+                    'reference' => 'TRF-' . strtoupper(Str::random(10)),
+                    'metadata' => [
+                        'recipient_wallet' => $recipientWallet->wallet_number,
+                        'recipient_name' => $validated['recipient_name'],
+                        'reason' => $validated['reason'],
+                        'direction' => 'out',
+                    ],
+                ]);
+
+                Transaction::create([
+                    'wallet_id' => $recipientWallet->id,
+                    'transaction_id' => (string) Str::uuid(),
+                    'type' => 'credit',
+                    'amount' => $validated['amount'],
+                    'total_amount' => $validated['amount'],
+                    'status' => 'completed',
+                    'payment_method' => 'transfer',
+                    'description' => 'Transfert reçu de ' . ($user->name ?? $wallet->wallet_number),
+                    'reference' => $senderTransaction->reference,
+                    'metadata' => [
+                        'sender_wallet' => $wallet->wallet_number,
+                        'sender_name' => $user->name,
+                        'reason' => $validated['reason'],
+                        'direction' => 'in',
+                    ],
+                ]);
+
+                $wallet->update(['last_transaction_at' => now()]);
+                $recipientWallet->update(['last_transaction_at' => now()]);
+
+                $this->createNotification($user->id, [
+                    'type' => 'transaction',
+                    'title' => 'Transfert effectué',
+                    'message' => 'Transfert de ' . number_format($validated['amount']) . ' XOF vers ' . $recipientWallet->wallet_number,
+                ]);
+
+                $this->createNotification($recipientWallet->user_id, [
+                    'type' => 'transaction',
+                    'title' => 'Transfert reçu',
+                    'message' => 'Réception de ' . number_format($validated['amount']) . ' XOF de ' . $user->name,
+                ]);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transfert effectué avec succès',
+                'new_balance' => $wallet->fresh()->balance
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur transfert: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur: ' . $e->getMessage()
+                       ], 500);
+        }
+    }
+
+    /**
+     * Gestion du PIN
+     */
+    public function setPin(Request $request)
+    {
+        $validated = $request->validate([
+            'current_pin' => 'nullable|string|size:6',
+            'new_pin' => 'required|string|size:6|confirmed',
+        ]);
+
+        $user = Auth::user();
+        $wallet = Wallet::where('user_id', $user->id)->first();
+
+        if (!$wallet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Portefeuille non trouvé.'
+            ], 404);
+        }
+
+        if ($validated['current_pin'] && !Hash::check($validated['current_pin'], $wallet->pin_hash)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PIN actuel incorrect.'
+            ], 400);
+        }
+
+        try {
+            $wallet->update([
+                'pin_hash' => Hash::make($validated['new_pin']),
+                'security_level' => 'protected',
+                'pin_changed_at' => now(),
+            ]);
+
+            $this->createNotification($user->id, [
+                'type' => 'security',
+                'title' => 'PIN modifié',
+                'message' => 'Votre code PIN a été mis à jour avec succès.',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'PIN mis à jour avec succès.'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur mise à jour PIN: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Vérification du PIN
+     */
+    public function verifyPin(Request $request)
+    {
+        $validated = $request->validate([
+            'pin' => 'required|string|size:6',
+        ]);
+
+        $user = Auth::user();
+        $wallet = Wallet::where('user_id', $user->id)->first();
+
+        if (!$wallet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Portefeuille non trouvé.'
+            ], 404);
+        }
+
+        if (Hash::check($validated['pin'], $wallet->pin_hash)) {
+            $token = bin2hex(random_bytes(32));
+            session(['wallet_auth_token' => $token]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'PIN vérifié avec succès.',
+                'auth_token' => $token,
+                'valid_for' => 300
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'PIN incorrect.'
+        ], 400);
+    }
+
+    /**
+     * Génère un numéro de wallet unique
+     */
+    private function generateWalletNumber()
+    {
+        $currentYear = date('y');
+        $currentMonth = date('m');
+        $lastWallet = Wallet::latest()->first();
+
+        if ($lastWallet && strpos($lastWallet->wallet_number, 'WALLET-' . $currentYear . $currentMonth) === 0) {
+            $lastNumber = intval(substr($lastWallet->wallet_number, -6));
+            $nextNumber = $lastNumber + 1;
         } else {
-            showToast('warning', 'Attention', result.message);
-            hideLoading();
+            $nextNumber = 1;
         }
 
-    } catch (error) {
-        console.error('Erreur complète:', error);
-        showToast('error', 'Erreur', error.message);
-        hideLoading();
+        return 'WALLET-' . $currentYear . $currentMonth . '-' . str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
     }
-}
 
-function showLoading(text, subtext) {
-    const overlay = document.getElementById('deposit-loading');
-    if (overlay) {
-        overlay.querySelector('.loading-text').textContent = text || 'Traitement en cours...';
-        overlay.querySelector('.loading-subtext').textContent = subtext || 'Veuillez patienter';
-        overlay.classList.add('active');
-    }
-}
+    /**
+     * Vérifie les mises à jour des financements
+     */
+    public function checkFundingUpdates()
+    {
+        try {
+            $user = Auth::user();
 
-function hideLoading() {
-    const overlay = document.getElementById('deposit-loading');
-    if (overlay) {
-        overlay.classList.remove('active');
-    }
-}
+            $pendingFundings = FundingRequest::where('user_id', $user->id)
+                ->whereIn('status', ['approved', 'paid', 'documents_validated', 'transfer_pending', 'completed'])
+                ->where('updated_at', '>', now()->subMinutes(5))
+                ->with(['fundingType', 'documents'])
+                ->get();
 
-function showDepositModal() {
-    const modal = document.getElementById('depositSlide');
-    if (modal) {
-        modal.classList.add('show');
-        document.body.style.overflow = 'hidden';
+            $updated = [];
 
-        setTimeout(() => {
-            const amountInput = document.getElementById('depositAmount');
-            if (amountInput && !amountInput.value) {
-                const firstCard = document.querySelector('.amount-card');
-                if (firstCard) firstCard.click();
+            foreach ($pendingFundings as $funding) {
+                $lastChecked = session()->get('last_funding_check_' . $funding->id, $funding->updated_at);
+
+                if ($funding->updated_at->gt($lastChecked)) {
+                    $updated[] = [
+                        'id' => $funding->id,
+                        'title' => $funding->title,
+                        'status' => $funding->status,
+                        'new_status' => $this->getStatusLabel($funding->status),
+                        'updated_at' => $funding->updated_at->format('d/m/Y H:i'),
+                        'request_number' => $funding->request_number ?? null,
+                    ];
+
+                    session()->put('last_funding_check_' . $funding->id, $funding->updated_at);
+                }
             }
-        }, 100);
-    }
-}
 
-function closeSlide(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-        modal.classList.remove('show');
-        document.body.style.overflow = 'auto';
-        hideLoading();
+            return response()->json([
+                'success' => true,
+                'updated' => $updated,
+                'has_updates' => count($updated) > 0,
+                'timestamp' => now()->format('Y-m-d H:i:s')
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la vérification des mises à jour',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
-}
 
-function showToast(type, title, message) {
-    if (window.toast && typeof window.toast[type] === 'function') {
-        window.toast[type](title, message);
-    } else if (typeof Swal !== 'undefined') {
-        Swal.fire({
-            icon: type === 'error' ? 'error' : type === 'success' ? 'success' : 'info',
-            title: title,
-            text: message,
-            timer: type === 'success' ? 3000 : undefined
-        });
-    } else {
-        alert(`${title}: ${message}`);
+    /**
+     * Labels des statuts
+     */
+    private function getStatusLabel($status)
+    {
+        $labels = [
+            'pending' => 'En attente',
+            'submitted' => 'Soumise',
+            'under_review' => 'En examen',
+            'validated' => 'Validée',
+            'approved' => 'Approuvée',
+            'rejected' => 'Rejetée',
+            'paid' => 'Payée',
+            'documents_validated' => 'Documents validés',
+            'transfer_pending' => 'Transfert en attente',
+            'funded' => 'Financée',
+            'credited' => 'Accréditée',
+            'completed' => 'Terminée'
+        ];
+
+        return $labels[$status] ?? $status;
+    }
+
+    /**
+     * Détails d'un financement
+     */
+    public function fundingDetails($id)
+    {
+        try {
+            $funding = FundingRequest::with(['fundingType', 'documents', 'validator'])
+                ->where('user_id', Auth::id())
+                ->findOrFail($id);
+
+            return response()->json([
+                'success' => true,
+                'funding' => [
+                    'id' => $funding->id,
+                    'title' => $funding->title,
+                    'type' => $funding->is_predefined ? 'Prédéfinie' : 'Personnalisée',
+                    'status' => $funding->status,
+                    'status_label' => $this->getStatusLabel($funding->status),
+                    'amount_requested' => $funding->amount_requested,
+                    'amount_approved' => $funding->amount_approved,
+                    'expected_payment' => $funding->expected_payment,
+                    'request_number' => $funding->request_number,
+                    'created_at' => $funding->created_at->format('d/m/Y'),
+                    'updated_at' => $funding->updated_at->format('d/m/Y H:i'),
+                    'validated_at' => $funding->validated_at?->format('d/m/Y H:i'),
+                    'admin_notes' => $funding->admin_validation_notes,
+                    'validator' => $funding->validator ? [
+                        'name' => $funding->validator->name,
+                        'validated_at' => $funding->validated_at?->format('d/m/Y'),
+                    ] : null,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Financement non trouvé'
+            ], 404);
+        }
+    }
+
+    /**
+     * Crédite un financement sur le wallet
+     */
+    public function creditFunding($id)
+    {
+        try {
+            $funding = FundingRequest::where('user_id', Auth::id())
+                ->whereIn('status', ['funded', 'completed', 'transfer_pending'])
+                ->findOrFail($id);
+
+            if ($funding->credited_at) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce financement a déjà été crédité'
+                ]);
+            }
+
+            if ($funding->is_predefined && $funding->transfer_status !== 'completed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le transfert n\'est pas encore finalisé par l\'administrateur'
+                ], 400);
+            }
+
+            $wallet = Auth::user()->wallet;
+            $amount = $funding->amount_approved ?? $funding->amount_requested;
+
+            DB::transaction(function () use ($wallet, $funding, $amount) {
+                $wallet->increment('balance', $amount);
+                $wallet->update(['last_transaction_at' => now()]);
+
+                $funding->update([
+                    'credited_at' => now(),
+                    'status' => 'credited'
+                ]);
+
+                Transaction::create([
+                    'wallet_id' => $wallet->id,
+                    'transaction_id' => (string) Str::uuid(),
+                    'type' => 'credit',
+                    'amount' => $amount,
+                    'total_amount' => $amount,
+                    'payment_method' => $funding->is_predefined ? 'bank_transfer' : 'kkiapay',
+                    'description' => 'Financement crédité: ' . $funding->request_number,
+                    'status' => 'completed',
+                    'reference' => 'FUND-' . $funding->request_number,
+                    'metadata' => [
+                        'funding_request_id' => $funding->id,
+                        'funding_type' => $funding->is_predefined ? 'predefined' : 'custom',
+                        'previous_balance' => $wallet->balance - $amount,
+                        'new_balance' => $wallet->balance,
+                    ]
+                ]);
+
+                $this->createNotification($wallet->user_id, [
+                    'type' => 'transaction',
+                    'title' => 'Financement crédité',
+                    'message' => 'Votre financement de ' . number_format($amount) . ' XOF a été crédité sur votre portefeuille.',
+                    'data' => ['funding_id' => $funding->id],
+                ]);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Financement crédité avec succès',
+                'new_balance' => $wallet->balance,
+                'credited_amount' => $amount
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error crediting funding', [
+                'user_id' => Auth::id(),
+                'funding_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de l\'accréditation'
+            ], 500);
+        }
+    }
+
+    /**
+     * Informations du wallet (API)
+     */
+    public function getWalletInfo()
+    {
+        try {
+            $user = Auth::user();
+            $wallet = Wallet::where('user_id', $user->id)->first();
+
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Portefeuille non trouvé'
+                ], 404);
+            }
+
+            $thirtyDaysAgo = now()->subDays(30);
+
+            $stats = [
+                'total_deposits' => $wallet->transactions()
+                    ->where('type', 'credit')
+                    ->where('status', 'completed')
+                    ->where('created_at', '>=', $thirtyDaysAgo)
+                    ->sum('amount'),
+
+                'total_withdrawals' => $wallet->transactions()
+                    ->where('type', 'debit')
+                    ->where('status', 'completed')
+                    ->where('created_at', '>=', $thirtyDaysAgo)
+                    ->sum('amount'),
+
+                'total_transfers' => $wallet->transactions()
+                    ->where('type', 'transfer')
+                    ->where('status', 'completed')
+                    ->where('created_at', '>=', $thirtyDaysAgo)
+                    ->sum('amount'),
+
+                'total_payments' => $wallet->transactions()
+                    ->where('type', 'payment')
+                    ->where('status', 'completed')
+                    ->where('created_at', '>=', $thirtyDaysAgo)
+                    ->sum('amount'),
+
+                'pending_transactions' => $wallet->transactions()
+                    ->whereIn('status', ['pending', 'processing'])
+                    ->count(),
+            ];
+
+            return response()->json([
+                'success' => true,
+                'wallet' => [
+                    'id' => $wallet->id,
+                    'wallet_number' => $wallet->wallet_number,
+                    'balance' => $wallet->balance,
+                    'currency' => $wallet->currency,
+                    'security_level' => $wallet->security_level ?? 'normal',
+                    'created_at' => $wallet->created_at->format('d/m/Y'),
+                ],
+                'stats' => $stats,
+                'has_pin' => ($wallet->security_level ?? 'normal') !== 'normal'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting wallet info', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des informations'
+            ], 500);
+        }
+    }
+
+    /**
+     * Actions rapides (API)
+     */
+    public function getQuickActions()
+    {
+        try {
+            $user = Auth::user();
+            $wallet = Wallet::where('user_id', $user->id)->first();
+
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Portefeuille non trouvé'
+                ], 404);
+            }
+
+            $actions = [
+                [
+                    'id' => 'deposit',
+                    'title' => 'Déposer',
+                    'icon' => 'fas fa-plus-circle',
+                    'color' => 'success',
+                    'available' => true,
+                    'description' => 'Ajouter de l\'argent à votre portefeuille'
+                ],
+                [
+                    'id' => 'withdraw',
+                    'title' => 'Retirer',
+                    'icon' => 'fas fa-minus-circle',
+                    'color' => 'danger',
+                    'available' => $wallet->balance > 1000,
+                    'description' => 'Retirer de l\'argent vers votre compte'
+                ],
+                [
+                    'id' => 'transfer',
+                    'title' => 'Transférer',
+                    'icon' => 'fas fa-exchange-alt',
+                    'color' => 'warning',
+                    'available' => $wallet->balance > 100,
+                    'description' => 'Envoyer de l\'argent à un autre portefeuille'
+                ],
+                [
+                    'id' => 'pay',
+                    'title' => 'Payer',
+                    'icon' => 'fas fa-credit-card',
+                    'color' => 'info',
+                    'available' => $wallet->balance > 0,
+                    'description' => 'Effectuer un paiement'
+                ],
+                [
+                    'id' => 'history',
+                    'title' => 'Historique',
+                    'icon' => 'fas fa-history',
+                    'color' => 'primary',
+                    'available' => true,
+                    'description' => 'Voir vos transactions'
+                ],
+                [
+                    'id' => 'qr_code',
+                    'title' => 'QR Code',
+                    'icon' => 'fas fa-qrcode',
+                    'color' => 'secondary',
+                    'available' => true,
+                    'description' => 'Générer un QR Code de paiement'
+                ]
+            ];
+
+            return response()->json([
+                'success' => true,
+                'actions' => $actions,
+                'balance' => $wallet->balance
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting quick actions', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des actions'
+            ], 500);
+        }
+    }
+
+    /**
+     * Pages de paiement (succès/échec)
+     */
+    public function paymentSuccess(Transaction $transaction)
+    {
+        if (auth()->check() && $transaction->wallet->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        return view('payment.success', compact('transaction'));
+    }
+
+    public function paymentFailed(Transaction $transaction)
+    {
+        if (auth()->check() && $transaction->wallet->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        return view('payment.failed', compact('transaction'));
+    }
+
+    public function paymentError()
+    {
+        return view('payment.error');
+    }
+
+    public function paymentStatus(Transaction $transaction)
+    {
+        if (auth()->check() && $transaction->wallet->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        return view('payment.status', compact('transaction'));
     }
 }
-</script>
-@endpush

@@ -102,4 +102,27 @@ public function ticket()
 
         return false;
     }
+
+    public function scopeOpen($query)
+    {
+        return $query->where('status', 'open');
+    }
+
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeClosed($query)
+    {
+        return $query->where('status', 'closed');
+    }
+
+    public function getUnreadCountAttribute()
+    {
+        return $this->messages()
+            ->where('is_admin', false)
+            ->where('read', false)
+            ->count();
+    }
 }
