@@ -751,10 +751,18 @@ window.showDepositModal = function() {
         showToast('Connexion requise', 'error');
         return;
     }
-    if (typeof window.DepositModal !== 'undefined') {
-        window.DepositModal.open();
+
+    // Ouvrir directement le modal depositSlide
+    const modal = document.getElementById('depositSlide');
+    if (modal) {
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        // Réinitialiser le formulaire si la fonction existe
+        if (typeof resetDepositForm === 'function') {
+            resetDepositForm();
+        }
     } else {
-        console.error('DepositModal non chargé');
+        console.error('Modal depositSlide non trouvé');
         showToast('Erreur de chargement du modal', 'error');
     }
 };
