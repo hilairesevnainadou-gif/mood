@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
+use Illuminate\Support\Facades\DB;
 
 class Transaction extends Model
 {
@@ -13,6 +16,7 @@ class Transaction extends Model
         'wallet_id',
         'transaction_id',
         'reference',
+        'kkiapay_transaction_id',
         'type',
         'amount',
         'fee',
@@ -21,7 +25,10 @@ class Transaction extends Model
         'status',
         'description',
         'metadata',
-        'completed_at'
+        'kkiapay_response',
+        'failure_reason',
+        'completed_at',
+        'paid_at',
     ];
 
     protected $casts = [
@@ -29,18 +36,44 @@ class Transaction extends Model
         'fee' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'metadata' => 'array',
-        'completed_at' => 'datetime'
+        'kkiapay_response' => 'array',
+        'completed_at' => 'datetime',
+        'paid_at' => 'datetime',
     ];
 
     /**
      * Relation avec le wallet
      */
-    public function wallet()
+    public function wallet(): BelongsTo
     {
         return $this->belongsTo(Wallet::class);
     }
 
-      /**
+    /**
+     * Relation avec l'utilisateur (via le wallet)
+     */
+    public function user(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            User::class,
+            Wallet::class,
+            'id',           // Clé locale sur wallets
+            'id',           // Clé locale sur users
+            'wallet_id',    // Clé étrangère sur transactions
+            'user_id'       // Clé étrangère sur wallets
+        );
+    }
+
+    /**
+     * Scope pour rechercher par référence Kkiapay
+     */
+    public function scopeByKkiapayId($query, string $transactionId)
+    {
+        return $query->where('kkiapay_transaction_id', $transactionId)
+            ->orWhere('reference', $transactionId);
+    }
+
+    /**
      * Labels pour les types
      */
     public function getTypeLabel(): string
@@ -52,6 +85,7 @@ class Transaction extends Model
             'payment' => 'Paiement',
             'refund' => 'Remboursement',
             'fee' => 'Frais',
+            'deposit' => 'Dépôt',
         ];
 
         return $labels[$this->type] ?? $this->type;
@@ -71,21 +105,6 @@ class Transaction extends Model
         ];
 
         return $labels[$this->status] ?? $this->status;
-    }
-
-    /**
-     * Relation avec l'utilisateur (via le wallet)
-     */
-    public function user()
-    {
-        return $this->hasOneThrough(
-            User::class,
-            Wallet::class,
-            'id',           // Clé locale sur wallets
-            'id',           // Clé locale sur users
-            'wallet_id',    // Clé étrangère sur transactions
-            'user_id'       // Clé étrangère sur wallets
-        );
     }
 
     // Accessors pour l'affichage
@@ -110,8 +129,8 @@ class Transaction extends Model
     public function getTypeIconAttribute(): string
     {
         return match($this->type) {
-            'deposit' => 'fa-arrow-down',
-            'withdrawal' => 'fa-arrow-up',
+            'deposit', 'credit' => 'fa-arrow-down',
+            'withdrawal', 'debit' => 'fa-arrow-up',
             'transfer' => 'fa-exchange-alt',
             'payment' => 'fa-credit-card',
             default => 'fa-circle',
@@ -124,8 +143,8 @@ class Transaction extends Model
     public function getTypeLabelAttribute(): string
     {
         return match($this->type) {
-            'deposit' => 'Dépôt',
-            'withdrawal' => 'Retrait',
+            'deposit', 'credit' => 'Dépôt',
+            'withdrawal', 'debit' => 'Retrait',
             'transfer' => 'Transfert',
             'payment' => 'Paiement',
             default => ucfirst($this->type),
@@ -139,6 +158,7 @@ class Transaction extends Model
     {
         return match($this->status) {
             'pending' => 'fa-clock',
+            'processing' => 'fa-spinner',
             'completed' => 'fa-check',
             'failed' => 'fa-xmark',
             'cancelled' => 'fa-ban',
@@ -153,6 +173,7 @@ class Transaction extends Model
     {
         return match($this->status) {
             'pending' => 'En attente',
+            'processing' => 'En cours',
             'completed' => 'Validée',
             'failed' => 'Échouée',
             'cancelled' => 'Annulée',
@@ -163,12 +184,12 @@ class Transaction extends Model
     // Scopes
     public function scopeDeposits($query)
     {
-        return $query->where('type', 'deposit');
+        return $query->whereIn('type', ['deposit', 'credit']);
     }
 
     public function scopeWithdrawals($query)
     {
-        return $query->where('type', 'withdrawal');
+        return $query->whereIn('type', ['withdrawal', 'debit']);
     }
 
     public function scopeTransfers($query)
@@ -222,13 +243,26 @@ class Transaction extends Model
 
     /**
      * Met à jour le statut et enregistre la date de complétion
+     * ET crédite le wallet si c'est un dépôt
      */
-    public function markAsCompleted(): void
+    public function markAsCompletedAndCredit(): void
     {
-        $this->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-        ]);
+        DB::transaction(function () {
+            $this->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'paid_at' => now()
+            ]);
+
+            // Créditer le wallet si c'est un dépôt/crédit
+            if ($this->type === 'credit' || $this->type === 'deposit') {
+                $wallet = $this->wallet;
+                if ($wallet) {
+                    $wallet->increment('balance', $this->amount);
+                    $wallet->update(['last_transaction_at' => now()]);
+                }
+            }
+        });
     }
 
     /**
@@ -239,8 +273,8 @@ class Transaction extends Model
         $this->update([
             'status' => 'failed',
             'completed_at' => now(),
+            'failure_reason' => $reason,
             'metadata' => array_merge($this->metadata ?? [], ['failure_reason' => $reason]),
         ]);
     }
 }
-

@@ -15,16 +15,17 @@ use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\ProgramController;
 use App\Http\Controllers\Api\StatController;
 use App\Http\Controllers\Api\WalletController as ApiWalletController;
+use App\Http\Controllers\Client\ClientWalletController as ClientWalletController; // SEUL import pour le wallet client
 use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
 use App\Http\Controllers\Client\DocumentController as ClientDocumentController;
+use App\Http\Controllers\Client\KkiapayCallbackController;
 use App\Http\Controllers\Client\ProfileController;
 use App\Http\Controllers\Client\RequestFundingController;
 use App\Http\Controllers\ClientController;
-use App\Http\Controllers\Client\ClientWalletController as ClientWalletController; // SEUL import pour le wallet client
+use App\Http\Controllers\PaymentCallbackController; // Contrôleur principal (API/callbacks)
 use App\Http\Controllers\PwaController;
 use App\Http\Controllers\SSEController;
 use App\Http\Controllers\TrainingController;
-use App\Http\Controllers\PaymentCallbackController; // Contrôleur principal (API/callbacks)
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -204,16 +205,26 @@ Route::get('/funding/check-updates', [ClientWalletController::class, 'checkFundi
     ->name('funding.check-updates')
     ->middleware(['auth', 'verified']);
 
-/*
-|--------------------------------------------------------------------------
-| KKIAPAY CALLBACK - ROUTES PUBLIQUES (hors auth et hors CSRF)
-|--------------------------------------------------------------------------
-*/
+// KKIAPAY CALLBACK - ROUTES PUBLIQUES (hors auth et hors CSRF)
+// ============================================================
+
+// Callback POST de Kkiapay (webhook) - CRITIQUE: sans CSRF
+Route::post('/kkiapay/callback', [KkiapayCallbackController::class, 'handleCallback'])
+    ->name('kkiapay.callback')
+    ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+// Route de retour utilisateur (GET) - redirection après paiement
+Route::get('/kkiapay/callback', [KkiapayCallbackController::class, 'handleReturn'])
+    ->name('kkiapay.return');
+
+// Vérification du statut (pour polling côté client)
+Route::get('/payment/status/{reference}', [KkiapayCallbackController::class, 'checkStatus'])
+    ->name('payment.status');
 
 // CALLBACK PRINCIPAL KKIAPAY - Doit être accessible publiquement
-Route::match(['get', 'post'], '/kkiapay/callback', [PaymentCallbackController::class, 'kkiapayCallback'])
-    ->name('kkiapay.callback')
-    ->withoutMiddleware(['auth', 'verified', \App\Http\Middleware\VerifyCsrfToken::class]);
+// Route::match(['get', 'post'], '/kkiapay/callback', [PaymentCallbackController::class, 'kkiapayCallback'])
+//     ->name('kkiapay.callback')
+//     ->withoutMiddleware(['auth', 'verified', \App\Http\Middleware\VerifyCsrfToken::class]);
 
 // CALLBACK ALTERNATIF pour dépôt wallet
 Route::post('/wallet/deposit/callback', [PaymentCallbackController::class, 'kkiapayCallback'])

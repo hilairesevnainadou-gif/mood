@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Wallet extends Model
 {
@@ -16,6 +18,7 @@ class Wallet extends Model
         'currency',
         'status',
         'pin_hash',
+        'security_level',
         'activated_at',
         'last_transaction_at'
     ];
@@ -26,19 +29,32 @@ class Wallet extends Model
         'last_transaction_at' => 'datetime'
     ];
 
-    // Relations
-    public function user()
+    /**
+     * Relation avec l'utilisateur
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function transactions()
+    /**
+     * Relation avec les transactions
+     */
+    public function transactions(): HasMany
     {
-        return $this->hasMany(Transaction::class);
+        return $this->hasMany(Transaction::class)->latest();
+    }
+
+    /**
+     * Relation avec l'historique des opérations
+     */
+    public function histories(): HasMany
+    {
+        return $this->hasMany(WalletHistory::class)->latest();
     }
 
     // Accessors
-    public function getFormattedBalanceAttribute()
+    public function getFormattedBalanceAttribute(): string
     {
         return number_format($this->balance, 2, ',', ' ') . ' ' . $this->currency;
     }
@@ -50,9 +66,47 @@ class Wallet extends Model
     }
 
     // Méthodes
-    public function canWithdraw($amount)
+    public function canWithdraw($amount): bool
     {
         return $this->balance >= $amount;
+    }
+
+    /**
+     * Crée une transaction de dépôt et crédite immédiatement
+     */
+    public function depositAndCredit($amount, $paymentMethod = 'kkiapay', $metadata = []): Transaction
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($amount, $paymentMethod, $metadata) {
+            // Créer la transaction
+            $transaction = $this->transactions()->create([
+                'transaction_id' => \Illuminate\Support\Str::uuid(),
+                'reference' => 'DEP-' . date('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(6)),
+                'type' => 'credit',
+                'amount' => $amount,
+                'total_amount' => $amount,
+                'fee' => 0,
+                'payment_method' => $paymentMethod,
+                'status' => 'completed', // Directement complété
+                'description' => 'Dépôt via ' . $paymentMethod,
+                'metadata' => $metadata,
+                'completed_at' => now(),
+                'paid_at' => now()
+            ]);
+
+            // Créditer immédiatement
+            $this->increment('balance', $amount);
+            $this->update(['last_transaction_at' => now()]);
+
+            // Créer l'historique
+            $this->histories()->create([
+                'type' => 'credit',
+                'amount' => $amount,
+                'description' => 'Dépôt via ' . $paymentMethod,
+                'transaction_id' => $transaction->id
+            ]);
+
+            return $transaction;
+        });
     }
 
     public function deposit($amount, $paymentMethod, $metadata = [])
@@ -62,7 +116,7 @@ class Wallet extends Model
             'type' => 'deposit',
             'amount' => $amount,
             'payment_method' => $paymentMethod,
-            'status' => 'completed',
+            'status' => 'pending', // En attente de confirmation
             'metadata' => $metadata
         ]);
     }
@@ -74,7 +128,7 @@ class Wallet extends Model
             'type' => 'withdrawal',
             'amount' => $amount,
             'payment_method' => $withdrawalMethod,
-            'status' => 'completed',
+            'status' => 'pending',
             'metadata' => $metadata
         ]);
     }

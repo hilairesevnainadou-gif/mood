@@ -606,28 +606,40 @@ public function getWalletInfo()
         });
     }
 
-    private function getMonthlyStats($wallet)
-    {
-        return Cache::remember("wallet_stats_{$wallet->id}_" . now()->format('Y-m'), 300, function () use ($wallet) {
-            $startOfMonth = now()->startOfMonth();
+    /**
+ * Statistiques mensuelles - version corrigée sans erreur SQL
+ */
+private function getMonthlyStats($wallet)
+{
+    return Cache::remember("wallet_stats_{$wallet->id}_" . now()->format('Y-m'), 300, function () use ($wallet) {
+        $startOfMonth = now()->startOfMonth();
 
-            $stats = $wallet->transactions()
-                ->where('created_at', '>=', $startOfMonth)
-                ->where('status', 'completed')
-                ->selectRaw("
-                    SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END) as deposits,
-                    SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END) as withdrawals,
-                    SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END) as payments
-                ")
-                ->first();
+        // Version simple avec requêtes séparées (pas de GROUP BY complexe)
+        $deposits = (float) $wallet->transactions()
+            ->whereIn('type', ['credit', 'deposit'])
+            ->where('created_at', '>=', $startOfMonth)
+            ->where('status', 'completed')
+            ->sum('amount') ?? 0;
 
-            return [
-                'deposits' => (float) ($stats->deposits ?? 0),
-                'withdrawals' => (float) ($stats->withdrawals ?? 0),
-                'payments' => (float) ($stats->payments ?? 0),
-            ];
-        });
-    }
+        $withdrawals = (float) $wallet->transactions()
+            ->whereIn('type', ['debit', 'withdrawal'])
+            ->where('created_at', '>=', $startOfMonth)
+            ->where('status', 'completed')
+            ->sum('amount') ?? 0;
+
+        $payments = (float) $wallet->transactions()
+            ->where('type', 'payment')
+            ->where('created_at', '>=', $startOfMonth)
+            ->where('status', 'completed')
+            ->sum('amount') ?? 0;
+
+        return [
+            'deposits' => $deposits,
+            'withdrawals' => $withdrawals,
+            'payments' => $payments,
+        ];
+    });
+}
 
     private function generateWalletNumber()
     {
