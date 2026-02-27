@@ -35,22 +35,7 @@ class KkiapayCallbackController extends Controller
             $status = $this->mapKkiapayStatus($request->input('status'));
             $amount = $request->input('amount');
 
-            // 🔑 CLÉ: Votre référence est dans "state", pas "data" !
-            $state = $request->input('state');
-            $yourReference = null;
-            $userId = null;
-
-            if (is_array($state)) {
-                $yourReference = $state['reference'] ?? null;  // "DEP-20260227-OSE2PO"
-                $userId = $state['user_id'] ?? null;           // 5
-            } elseif (is_string($state)) {
-                // Au cas où state serait JSON string
-                $decoded = json_decode($state, true);
-                if ($decoded) {
-                    $yourReference = $decoded['reference'] ?? null;
-                    $userId = $decoded['user_id'] ?? null;
-                }
-            }
+            [$yourReference, $userId] = $this->extractReferenceAndUser($request);
 
             Log::info('Données extraites', [
                 'kkiapay_id' => $kkiapayId,
@@ -61,8 +46,12 @@ class KkiapayCallbackController extends Controller
             ]);
 
             if (!$yourReference) {
-                Log::error('Référence non trouvée dans state', ['state' => $state]);
-                return response()->json(['error' => 'Reference not found in state'], 400);
+                Log::error('Référence non trouvée dans le callback', [
+                    'state' => $request->input('state'),
+                    'data' => $request->input('data'),
+                    'metadata' => $request->input('metadata'),
+                ]);
+                return response()->json(['error' => 'Reference not found in callback payload'], 400);
             }
 
             // 🔍 RECHERCHE par VOTRE référence (prioritaire)
@@ -145,7 +134,7 @@ class KkiapayCallbackController extends Controller
                     'transaction_id' => $transaction->id
                 ]);
 
-            } else {
+            } elseif ($status === 'failed') {
                 // Échec
                 $transaction->update([
                     'kkiapay_transaction_id' => $kkiapayId,
@@ -155,6 +144,12 @@ class KkiapayCallbackController extends Controller
                 ]);
 
                 Log::warning('Paiement échoué', ['status' => $status]);
+
+            } else {
+                Log::warning('Callback reçu avec statut non final', [
+                    'status' => $status,
+                    'reference' => $transaction->reference,
+                ]);
             }
 
             return response()->json(['success' => true]);
@@ -174,14 +169,57 @@ class KkiapayCallbackController extends Controller
      */
     private function mapKkiapayStatus($status): string
     {
-        // D'après le payload: status: 1 = pending/success ?
-        // À vérifier avec la doc Kkiapay officielle
-        return match((int)$status) {
-            1 => 'success',    // ou 'pending' selon doc Kkiapay
-            2 => 'success',
+        if (is_string($status)) {
+            $normalized = strtolower(trim($status));
+
+            return match ($normalized) {
+                'success', 'succeeded', 'completed', 'paid' => 'success',
+                'failed', 'error', 'cancelled', 'canceled' => 'failed',
+                'pending', 'processing' => 'pending',
+                default => 'unknown',
+            };
+        }
+
+        return match ((int) $status) {
+            1, 2 => 'success',
             3 => 'failed',
-            default => 'unknown'
+            default => 'unknown',
         };
+    }
+
+    /**
+     * Extrait la référence interne et l'utilisateur depuis différents formats Kkiapay.
+     */
+    private function extractReferenceAndUser(Request $request): array
+    {
+        $candidates = [
+            $request->input('state'),
+            $request->input('data'),
+            $request->input('metadata'),
+            $request->input('custom_data'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate)) {
+                $candidate = json_decode($candidate, true);
+            }
+
+            if (!is_array($candidate)) {
+                continue;
+            }
+
+            $reference = $candidate['reference'] ?? null;
+            $userId = $candidate['user_id'] ?? null;
+
+            if ($reference) {
+                return [$reference, $userId];
+            }
+        }
+
+        return [
+            $request->input('reference') ?: null,
+            null,
+        ];
     }
 
     /**
