@@ -57,10 +57,10 @@ class Transaction extends Model
         return $this->hasOneThrough(
             User::class,
             Wallet::class,
-            'id',           // Clé locale sur wallets
-            'id',           // Clé locale sur users
-            'wallet_id',    // Clé étrangère sur transactions
-            'user_id'       // Clé étrangère sur wallets
+            'id',
+            'id',
+            'wallet_id',
+            'user_id'
         );
     }
 

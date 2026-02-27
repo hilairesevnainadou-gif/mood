@@ -204,32 +204,24 @@ Route::get('/service-worker.js', function () {
 Route::get('/funding/check-updates', [ClientWalletController::class, 'checkFundingUpdates'])
     ->name('funding.check-updates')
     ->middleware(['auth', 'verified']);
+/*
+|--------------------------------------------------------------------------
+| KKIAPAY CALLBACKS - Routes Publiques (hors auth et sans CSRF)
+|--------------------------------------------------------------------------
+*/
 
-// KKIAPAY CALLBACK - ROUTES PUBLIQUES (hors auth et hors CSRF)
-// ============================================================
-
-// Callback POST de Kkiapay (webhook) - CRITIQUE: sans CSRF
+// Callback principal de Kkiapay (webhook) - Déclenche le crédit wallet
 Route::post('/kkiapay/callback', [KkiapayCallbackController::class, 'handleCallback'])
     ->name('kkiapay.callback')
     ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
-// Route de retour utilisateur (GET) - redirection après paiement
-Route::get('/kkiapay/callback', [KkiapayCallbackController::class, 'handleReturn'])
+// Route de retour utilisateur après paiement (redirection)
+Route::get('/kkiapay/return', [KkiapayCallbackController::class, 'handleReturn'])
     ->name('kkiapay.return');
 
-// Vérification du statut (pour polling côté client)
-Route::get('/payment/status/{reference}', [KkiapayCallbackController::class, 'checkStatus'])
-    ->name('payment.status');
-
-// CALLBACK PRINCIPAL KKIAPAY - Doit être accessible publiquement
-// Route::match(['get', 'post'], '/kkiapay/callback', [PaymentCallbackController::class, 'kkiapayCallback'])
-//     ->name('kkiapay.callback')
-//     ->withoutMiddleware(['auth', 'verified', \App\Http\Middleware\VerifyCsrfToken::class]);
-
-// CALLBACK ALTERNATIF pour dépôt wallet
-Route::post('/wallet/deposit/callback', [PaymentCallbackController::class, 'kkiapayCallback'])
-    ->name('client.wallet.deposit.callback')
-    ->withoutMiddleware(['auth', 'verified', \App\Http\Middleware\VerifyCsrfToken::class]);
+// API: Vérification du statut d'une transaction (pour polling frontend)
+Route::get('/kkiapay/status/{reference}', [KkiapayCallbackController::class, 'checkStatus'])
+    ->name('kkiapay.status');
 
 // Routes de paiement (protégées par auth)
 Route::middleware(['auth', 'verified'])->group(function () {

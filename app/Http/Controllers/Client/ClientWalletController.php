@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\FundingRequest;
-use App\Models\Notification;
 use App\Models\Transaction;
 use App\Models\Wallet;
 use Illuminate\Http\Request;
@@ -53,8 +52,6 @@ class ClientWalletController extends Controller
         return view('client.wallet.index', compact('wallet', 'transactions', 'pendingFundings', 'monthlyStats'));
     }
 
-
-
     /**
      * Liste des transactions
      */
@@ -67,7 +64,7 @@ class ClientWalletController extends Controller
 
         $query = $wallet->transactions()
             ->select(['id', 'transaction_id', 'type', 'amount', 'status', 'payment_method',
-                     'description', 'reference', 'created_at', 'metadata'])
+                'description', 'reference', 'created_at', 'metadata'])
             ->latest();
 
         if ($request->filled('type')) {
@@ -103,7 +100,8 @@ class ClientWalletController extends Controller
     }
 
     /**
-     * Dépôt via Kkiapay
+     * Initialise un dépôt via Kkiapay
+     * POST /client/wallet/deposit
      */
     public function deposit(Request $request)
     {
@@ -115,54 +113,58 @@ class ClientWalletController extends Controller
         $user = Auth::user();
         $wallet = Wallet::where('user_id', $user->id)->first();
 
-        if (!$wallet) {
+        if (! $wallet) {
             return response()->json([
                 'success' => false,
-                'message' => 'Portefeuille non trouvé.'
+                'message' => 'Portefeuille non trouvé.',
             ], 404);
         }
 
         try {
-            $transactionId = 'KKP-' . strtoupper(Str::random(12));
-            $reference = 'DEP-' . date('Ymd') . '-' . strtoupper(Str::random(6));
+            // Génération des identifiants
+            $transactionId = 'KKP-'.strtoupper(Str::random(12));
+            $reference = 'DEP-'.date('Ymd').'-'.strtoupper(Str::random(6));
 
+            // CRÉATION de la transaction en PENDING
             $transaction = Transaction::create([
                 'wallet_id' => $wallet->id,
                 'transaction_id' => $transactionId,
-                'reference' => $reference,
-                'type' => 'credit',
+                'reference' => $reference,        // Cette référence est envoyée à Kkiapay
+                'type' => 'credit',               // ENUM: credit = dépôt d'argent
                 'amount' => $validated['amount'],
                 'total_amount' => $validated['amount'],
                 'fee' => 0,
-                'status' => 'pending',
+                'status' => 'pending',            // En attente du callback Kkiapay
                 'payment_method' => 'kkiapay',
                 'description' => 'Dépôt via Kkiapay',
                 'metadata' => json_encode([
                     'phone' => $validated['phone'],
                     'user_name' => $user->name,
                     'user_email' => $user->email,
-                    'initiated_at' => now()->toIso8601String(),
                 ]),
             ]);
 
-            Cache::forget("wallet_user_{$user->id}");
-            Cache::forget("wallet_tx_{$wallet->id}");
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Transaction initiée',
-                'transaction_id' => $transactionId,
+            Log::info('Dépôt initié', [
+                'transaction_id' => $transaction->id,
                 'reference' => $reference,
                 'amount' => $validated['amount'],
-                'user_name' => $user->name,
-                'user_email' => $user->email,
+            ]);
+
+            // Retourne les données pour ouvrir le widget Kkiapay
+            return response()->json([
+                'success' => true,
+                'reference' => $reference,           // IMPORTANT: envoyé à Kkiapay
+                'transaction_id' => $transactionId,
+                'amount' => $validated['amount'],
+                'phone' => $validated['phone'],
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Erreur création transaction dépôt: ' . $e->getMessage());
+            Log::error('Erreur dépôt', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur: ' . $e->getMessage()
+                'message' => 'Erreur: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -187,14 +189,14 @@ class ClientWalletController extends Controller
             if ($validated['withdraw_method'] === 'mobile_money' && empty($validated['phone_number'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Le numéro de téléphone est requis pour Mobile Money'
+                    'message' => 'Le numéro de téléphone est requis pour Mobile Money',
                 ], 422);
             }
 
             $user = Auth::user();
             $wallet = Wallet::where('user_id', $user->id)->first();
 
-            if (!$wallet || !Hash::check($validated['pin'], $wallet->pin_hash)) {
+            if (! $wallet || ! Hash::check($validated['pin'], $wallet->pin_hash)) {
                 return response()->json(['success' => false, 'message' => 'PIN incorrect'], 403);
             }
 
@@ -202,7 +204,7 @@ class ClientWalletController extends Controller
             if ((float) $wallet->balance < $amount) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Solde insuffisant'
+                    'message' => 'Solde insuffisant',
                 ], 400);
             }
 
@@ -218,7 +220,7 @@ class ClientWalletController extends Controller
                 'status' => 'pending',
                 'payment_method' => $validated['withdraw_method'],
                 'description' => 'Demande de retrait',
-                'reference' => 'WIT-' . strtoupper(Str::random(10)),
+                'reference' => 'WIT-'.strtoupper(Str::random(10)),
                 'metadata' => json_encode([
                     'phone' => $validated['phone_number'] ?? null,
                     'account_name' => $validated['account_name'] ?? null,
@@ -239,7 +241,8 @@ class ClientWalletController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Erreur retrait: ' . $e->getMessage());
+            Log::error('Erreur retrait: '.$e->getMessage());
+
             return response()->json(['success' => false, 'message' => 'Erreur serveur'], 500);
         }
     }
@@ -259,7 +262,7 @@ class ClientWalletController extends Controller
         $senderWallet = Wallet::where('user_id', $user->id)->first();
         $recipientWallet = Wallet::where('wallet_number', $validated['recipient_wallet'])->first();
 
-        if (!$senderWallet || !$recipientWallet) {
+        if (! $senderWallet || ! $recipientWallet) {
             return response()->json(['success' => false, 'message' => 'Portefeuille non trouvé'], 404);
         }
 
@@ -273,11 +276,11 @@ class ClientWalletController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($senderWallet, $recipientWallet, $amount, $user, $validated) {
+            DB::transaction(function () use ($senderWallet, $recipientWallet, $amount, $user) {
                 $senderWallet->decrement('balance', $amount);
                 $recipientWallet->increment('balance', $amount);
 
-                $ref = 'TRF-' . strtoupper(Str::random(10));
+                $ref = 'TRF-'.strtoupper(Str::random(10));
 
                 Transaction::create([
                     'wallet_id' => $senderWallet->id,
@@ -286,7 +289,7 @@ class ClientWalletController extends Controller
                     'amount' => $amount,
                     'status' => 'completed',
                     'payment_method' => 'transfer',
-                    'description' => 'Transfert vers ' . $recipientWallet->wallet_number,
+                    'description' => 'Transfert vers '.$recipientWallet->wallet_number,
                     'reference' => $ref,
                 ]);
 
@@ -297,7 +300,7 @@ class ClientWalletController extends Controller
                     'amount' => $amount,
                     'status' => 'completed',
                     'payment_method' => 'transfer',
-                    'description' => 'Transfert de ' . $user->name,
+                    'description' => 'Transfert de '.$user->name,
                     'reference' => $ref,
                 ]);
             }, 3);
@@ -310,11 +313,12 @@ class ClientWalletController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Transfert effectué',
-                'new_balance' => $senderWallet->fresh()->balance
+                'new_balance' => $senderWallet->fresh()->balance,
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Erreur transfert: ' . $e->getMessage());
+            Log::error('Erreur transfert: '.$e->getMessage());
+
             return response()->json(['success' => false, 'message' => 'Erreur serveur'], 500);
         }
     }
@@ -332,17 +336,16 @@ class ClientWalletController extends Controller
         $user = Auth::user();
         $wallet = Wallet::where('user_id', $user->id)->first();
 
-        if (!$wallet) {
+        if (! $wallet) {
             return response()->json(['success' => false, 'message' => 'Portefeuille non trouvé'], 404);
         }
 
-        if ($validated['current_pin'] && !Hash::check($validated['current_pin'], $wallet->pin_hash)) {
+        if ($validated['current_pin'] && ! Hash::check($validated['current_pin'], $wallet->pin_hash)) {
             return response()->json(['success' => false, 'message' => 'PIN actuel incorrect'], 400);
         }
 
         $wallet->update([
             'pin_hash' => Hash::make($validated['new_pin']),
-            'security_level' => 'protected',
         ]);
 
         return response()->json(['success' => true, 'message' => 'PIN mis à jour']);
@@ -358,7 +361,7 @@ class ClientWalletController extends Controller
         $user = Auth::user();
         $wallet = Wallet::where('user_id', $user->id)->first();
 
-        if (!$wallet || !Hash::check($validated['pin'], $wallet->pin_hash)) {
+        if (! $wallet || ! Hash::check($validated['pin'], $wallet->pin_hash)) {
             return response()->json(['success' => false, 'message' => 'PIN incorrect'], 400);
         }
 
@@ -368,49 +371,50 @@ class ClientWalletController extends Controller
         return response()->json([
             'success' => true,
             'auth_token' => $token,
-            'valid_for' => 300
+            'valid_for' => 300,
         ]);
     }
 
     /**
      * Informations du wallet (API)
      */
-public function getWalletInfo()
-{
-    try {
-        $user = Auth::user();
+    public function getWalletInfo()
+    {
+        try {
+            $user = Auth::user();
 
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Non authentifié'], 401);
+            if (! $user) {
+                return response()->json(['success' => false, 'message' => 'Non authentifié'], 401);
+            }
+
+            $wallet = Cache::remember("wallet_info_{$user->id}", 30, function () use ($user) {
+                return Wallet::where('user_id', $user->id)
+                    ->select(['id', 'wallet_number', 'balance', 'currency', 'status', 'created_at'])
+                    ->first();
+            });
+
+            if (! $wallet) {
+                return response()->json(['success' => false, 'message' => 'Portefeuille non trouvé'], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'wallet' => [
+                    'id' => $wallet->id,
+                    'wallet_number' => $wallet->wallet_number,
+                    'balance' => (float) $wallet->balance,
+                    'currency' => $wallet->currency,
+                    'status' => $wallet->status,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error wallet info: '.$e->getMessage());
+
+            return response()->json(['success' => false, 'message' => 'Erreur serveur'], 500);
         }
-
-        $wallet = Cache::remember("wallet_info_{$user->id}", 30, function () use ($user) {
-            return Wallet::where('user_id', $user->id)
-                ->select(['id', 'wallet_number', 'balance', 'currency', 'status', 'created_at']) // ← RETIRÉ 'security_level'
-                ->first();
-        });
-
-        if (!$wallet) {
-            return response()->json(['success' => false, 'message' => 'Portefeuille non trouvé'], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'wallet' => [
-                'id' => $wallet->id,
-                'wallet_number' => $wallet->wallet_number,
-                'balance' => (float) $wallet->balance,
-                'currency' => $wallet->currency,
-                'status' => $wallet->status,
-                // 'security_level' => 'normal', // ← COMMENTÉ ou SUPPRIMÉ
-            ]
-        ]);
-
-    } catch (\Exception $e) {
-        Log::error('Error wallet info: ' . $e->getMessage());
-        return response()->json(['success' => false, 'message' => 'Erreur serveur'], 500);
     }
-}
+
     /**
      * Vérifie les mises à jour des financements
      */
@@ -456,12 +460,12 @@ public function getWalletInfo()
             $funding = FundingRequest::where('user_id', Auth::id())
                 ->where('id', $id)
                 ->select(['id', 'title', 'status', 'amount_requested', 'amount_approved',
-                         'request_number', 'created_at', 'updated_at', 'validated_at',
-                         'admin_validation_notes', 'is_predefined'])
+                    'request_number', 'created_at', 'updated_at', 'validated_at',
+                    'admin_validation_notes', 'is_predefined'])
                 ->with(['fundingType:id,name', 'validator:id,name'])
                 ->first();
 
-            if (!$funding) {
+            if (! $funding) {
                 return response()->json(['success' => false, 'message' => 'Non trouvé'], 404);
             }
 
@@ -477,7 +481,7 @@ public function getWalletInfo()
                     'request_number' => $funding->request_number,
                     'created_at' => $funding->created_at->format('d/m/Y'),
                     'admin_notes' => $funding->admin_validation_notes,
-                ]
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -500,7 +504,7 @@ public function getWalletInfo()
                 ->select(['id', 'amount_approved', 'amount_requested', 'request_number', 'is_predefined', 'transfer_status'])
                 ->first();
 
-            if (!$funding) {
+            if (! $funding) {
                 return response()->json(['success' => false, 'message' => 'Financement non disponible'], 400);
             }
 
@@ -523,8 +527,8 @@ public function getWalletInfo()
                     'amount' => $amount,
                     'status' => 'completed',
                     'payment_method' => 'funding',
-                    'description' => 'Financement: ' . $funding->request_number,
-                    'reference' => 'FUND-' . $funding->request_number,
+                    'description' => 'Financement: '.$funding->request_number,
+                    'reference' => 'FUND-'.$funding->request_number,
                 ]);
             }, 3);
 
@@ -535,11 +539,12 @@ public function getWalletInfo()
             return response()->json([
                 'success' => true,
                 'message' => 'Financement crédité',
-                'new_balance' => $wallet->fresh()->balance
+                'new_balance' => $wallet->fresh()->balance,
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error crediting funding: ' . $e->getMessage());
+            Log::error('Error crediting funding: '.$e->getMessage());
+
             return response()->json(['success' => false, 'message' => 'Erreur serveur'], 500);
         }
     }
@@ -554,11 +559,11 @@ public function getWalletInfo()
 
             $wallet = Cache::remember("wallet_quick_{$user->id}", 30, function () use ($user) {
                 return Wallet::where('user_id', $user->id)
-                    ->select(['id', 'balance', 'security_level'])
+                    ->select(['id', 'balance'])
                     ->first();
             });
 
-            if (!$wallet) {
+            if (! $wallet) {
                 return response()->json(['success' => false, 'message' => 'Portefeuille non trouvé'], 404);
             }
 
@@ -566,13 +571,13 @@ public function getWalletInfo()
 
             $actions = [
                 ['id' => 'deposit', 'title' => 'Déposer', 'icon' => 'fa-plus-circle',
-                 'color' => 'success', 'available' => true],
+                    'color' => 'success', 'available' => true],
                 ['id' => 'withdraw', 'title' => 'Retirer', 'icon' => 'fa-minus-circle',
-                 'color' => 'danger', 'available' => $balance > 1000],
+                    'color' => 'danger', 'available' => $balance > 1000],
                 ['id' => 'transfer', 'title' => 'Transférer', 'icon' => 'fa-exchange-alt',
-                 'color' => 'warning', 'available' => $balance > 100],
+                    'color' => 'warning', 'available' => $balance > 100],
                 ['id' => 'history', 'title' => 'Historique', 'icon' => 'fa-history',
-                 'color' => 'primary', 'available' => true],
+                    'color' => 'primary', 'available' => true],
             ];
 
             return response()->json(['success' => true, 'actions' => $actions, 'balance' => $balance]);
@@ -585,20 +590,18 @@ public function getWalletInfo()
     /**
      * Méthodes privées utilitaires
      */
-
     private function getOrCreateWallet($user)
     {
         return Cache::remember("wallet_user_{$user->id}", 60, function () use ($user) {
             $wallet = Wallet::where('user_id', $user->id)->first();
 
-            if (!$wallet) {
+            if (! $wallet) {
                 $wallet = Wallet::create([
                     'user_id' => $user->id,
                     'wallet_number' => $this->generateWalletNumber(),
                     'balance' => 0,
                     'currency' => 'XOF',
                     'pin_hash' => Hash::make('000000'),
-                    'security_level' => 'normal',
                 ]);
             }
 
@@ -607,46 +610,46 @@ public function getWalletInfo()
     }
 
     /**
- * Statistiques mensuelles - version corrigée sans erreur SQL
- */
-private function getMonthlyStats($wallet)
-{
-    return Cache::remember("wallet_stats_{$wallet->id}_" . now()->format('Y-m'), 300, function () use ($wallet) {
-        $startOfMonth = now()->startOfMonth();
+     * Statistiques mensuelles
+     */
+    private function getMonthlyStats($wallet)
+    {
+        return Cache::remember("wallet_stats_{$wallet->id}_".now()->format('Y-m'), 300, function () use ($wallet) {
+            $startOfMonth = now()->startOfMonth();
 
-        // Version simple avec requêtes séparées (pas de GROUP BY complexe)
-        $deposits = (float) $wallet->transactions()
-            ->whereIn('type', ['credit', 'deposit'])
-            ->where('created_at', '>=', $startOfMonth)
-            ->where('status', 'completed')
-            ->sum('amount') ?? 0;
+            $deposits = (float) $wallet->transactions()
+                ->where('type', 'credit')
+                ->where('created_at', '>=', $startOfMonth)
+                ->where('status', 'completed')
+                ->sum('amount') ?? 0;
 
-        $withdrawals = (float) $wallet->transactions()
-            ->whereIn('type', ['debit', 'withdrawal'])
-            ->where('created_at', '>=', $startOfMonth)
-            ->where('status', 'completed')
-            ->sum('amount') ?? 0;
+            $withdrawals = (float) $wallet->transactions()
+                ->where('type', 'debit')
+                ->where('created_at', '>=', $startOfMonth)
+                ->where('status', 'completed')
+                ->sum('amount') ?? 0;
 
-        $payments = (float) $wallet->transactions()
-            ->where('type', 'payment')
-            ->where('created_at', '>=', $startOfMonth)
-            ->where('status', 'completed')
-            ->sum('amount') ?? 0;
+            $payments = (float) $wallet->transactions()
+                ->where('type', 'payment')
+                ->where('created_at', '>=', $startOfMonth)
+                ->where('status', 'completed')
+                ->sum('amount') ?? 0;
 
-        return [
-            'deposits' => $deposits,
-            'withdrawals' => $withdrawals,
-            'payments' => $payments,
-        ];
-    });
-}
+            return [
+                'deposits' => $deposits,
+                'withdrawals' => $withdrawals,
+                'payments' => $payments,
+            ];
+        });
+    }
 
     private function generateWalletNumber()
     {
-        $prefix = 'WALLET-' . date('ym');
-        $last = Wallet::where('wallet_number', 'like', $prefix . '%')->orderBy('id', 'desc')->first();
+        $prefix = 'WALLET-'.date('ym');
+        $last = Wallet::where('wallet_number', 'like', $prefix.'%')->orderBy('id', 'desc')->first();
         $next = $last ? ((int) substr($last->wallet_number, -6) + 1) : 1;
-        return $prefix . '-' . str_pad($next, 6, '0', STR_PAD_LEFT);
+
+        return $prefix.'-'.str_pad($next, 6, '0', STR_PAD_LEFT);
     }
 
     private function getStatusLabel($status)
@@ -661,6 +664,7 @@ private function getMonthlyStats($wallet)
             'funded' => 'Financée',
             'credited' => 'Créditée',
         ];
+
         return $labels[$status] ?? $status;
     }
 }
